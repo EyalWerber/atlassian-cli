@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(python -m py_compile atlassian_cli/integrations/confluence.py)",
+      "Bash(python -c \"from atlassian_cli.commands.prd import app; print\\('PRD commands: OK'\\)\")",
+      "Bash(python -c \"from atlassian_cli.main import app; print\\('Main app: OK'\\)\")",
+      "Bash(python -m atlassian_cli.main --help)",
+      "Bash(python -m atlassian_cli.main feature --help)",
+      "Bash(python -m atlassian_cli.main prd --help)",
+      "Read(//I_do/Programing/Python/agentic_stuff/jira_cli/atlassian_cli/**)",
+      "Read(//i/I_do/Programing/Python/agentic_stuff/jira_cli/atlassian_cli/**)",
+      "Bash(python -c \"import setuptools; print\\(setuptools.__version__\\)\")",
+      "Bash(atlassian --help)",
+      "Bash(atlassian feature *)",
+      "Bash(atlassian prd *)",
+      "PowerShell(Set-Location C:\\\\Windows\\\\Temp; atlassian feature list; Write-Host \"Exit code: $LASTEXITCODE\")",
+      "PowerShell(Set-Location C:\\\\Windows\\\\Temp; atlassian feature create --name \"test\" --type \"new-feature\" --description \"test\" --no-jira 2>&1; Write-Host \"Exit code: $LASTEXITCODE\")",
+      "PowerShell(Set-Location \"I:\\\\I_do\\\\Programing\\\\Python\\\\agentic_stuff\\\\jira_cli\"; atlassian feature create --name \"Test Feature\" --type \"new-feature\" --description \"A test feature to verify storage\" --no-jira 2>&1; Write-Host \"Exit code: $LASTEXITCODE\")",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.atlassian-cli\\\\features\" 2>&1)",
+      "Read(//c/Users/eyalv/.atlassian-cli/features/**)"
+    ]
+  }
+}
