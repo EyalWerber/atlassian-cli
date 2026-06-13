@@ -67,6 +67,7 @@ class OllamaClient:
     def __init__(self, settings: Settings):
         self.host = settings.ollama_host
         self.model = settings.ollama_model
+        self.embed_model = settings.ollama_embed_model
 
     def decompose_prd(self, prd: PRD) -> dict:
         user_content = "\n\n".join([
@@ -151,5 +152,22 @@ class OllamaClient:
         try:
             content = response.json()["message"]["content"]
             return json.loads(content)
+        except (KeyError, ValueError) as e:
+            raise RuntimeError(f"Ollama returned unexpected response format: {e}")
+
+    def embed(self, text: str) -> list[float]:
+        try:
+            response = requests.post(
+                f"{self.host}/api/embeddings",
+                json={"model": self.embed_model, "prompt": text},
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.exceptions.ConnectionError:
+            raise RuntimeError(f"Ollama not available at {self.host}. Is it running?")
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Ollama request failed: {e}")
+        try:
+            return response.json()["embedding"]
         except (KeyError, ValueError) as e:
             raise RuntimeError(f"Ollama returned unexpected response format: {e}")
