@@ -12,7 +12,9 @@ from atlassian_cli.integrations.ollama import OllamaClient
 from atlassian_cli.models.feature import Feature
 from atlassian_cli.models.prd import PRD
 from atlassian_cli.models.qa import QAPlan, QAPlanStatus, QAScenario
+from atlassian_cli.models.memory import Memory, MemoryType
 from atlassian_cli.storage.local import LocalStorage
+from atlassian_cli.storage.memory_store import MemoryStore
 
 app = typer.Typer(help="Generate and manage QA plans")
 console = Console()
@@ -211,3 +213,29 @@ def bug(
         "qa",
     )
     console.print(f"[green]✓[/green] QA Plan updated  [{qa_id}]")
+
+    # Auto-save memory note (best-effort — bug filing must never fail because Ollama is down)
+    try:
+        mem_store = MemoryStore(
+            db_path=settings.memory_db_path,
+            vector_path=settings.memory_vector_path,
+            ollama=OllamaClient(settings),
+        )
+        now_mem = datetime.now(timezone.utc)
+        mem = Memory(
+            id=mem_store.next_id(),
+            content=(
+                f"Bug {bug_key} filed: [{qa_id}] scenario '{scenario}'. "
+                f"Actual: {actual}. Expected: {expected}."
+            ),
+            type=MemoryType.note,
+            tags=["bug"],
+            feature_id=plan.feature_id,
+            qa_id=qa_id,
+            created_at=now_mem,
+            updated_at=now_mem,
+        )
+        mem_store.add(mem)
+        console.print(f"[green]✓[/green] Memory auto-saved  [{mem.id}]")
+    except Exception:
+        console.print("[dim]  (memory auto-save skipped — Ollama not available)[/dim]")
