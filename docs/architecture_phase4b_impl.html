@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>body { background: #0d1117; margin: 0; padding: 0; }</style>
+</head>
+<body>
+<svg width="1400" height="880" viewBox="0 0 1400 880" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="ah-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#8b949e"/></marker>
+  <marker id="ah-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#58a6ff"/></marker>
+  <marker id="ah-orange" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"><polygon points="0 0,10 4,0 8" fill="#ffa657"/></marker>
+  <marker id="ah-teal" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#39d353"/></marker>
+  <marker id="ah-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f85149"/></marker>
+  <marker id="ah-purple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#bc8cff"/></marker>
+</defs>
+
+<rect width="1400" height="880" fill="#0d1117"/>
+
+<!-- ══ TITLE ══ -->
+<text x="700" y="32" text-anchor="middle" fill="#e6edf3" font-size="21" font-weight="bold" font-family="'Segoe UI',sans-serif">atlassian-cli  Phase 4b — ADR System + Bug→Memory Auto-link</text>
+<text x="700" y="52" text-anchor="middle" fill="#6e7681" font-size="12" font-family="'Segoe UI',sans-serif">Architecture Decision Records  ·  qa bug auto-saves memory  ·  best-effort Ollama resilience</text>
+
+<!-- ══ COMMANDS ROW (y=64-118) ══ -->
+
+<!-- adr add (orange) -->
+<rect x="66" y="64" width="148" height="54" rx="8" fill="#1c2128" stroke="#ffa657" stroke-width="2"/>
+<text x="140" y="88" text-anchor="middle" fill="#ffa657" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">adr add</text>
+<text x="140" y="106" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">write · embed best-effort</text>
+
+<!-- adr list (blue) -->
+<rect x="230" y="64" width="148" height="54" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="304" y="88" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">adr list</text>
+<text x="304" y="106" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">LocalStorage only</text>
+
+<!-- adr show (blue) -->
+<rect x="394" y="64" width="148" height="54" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="468" y="88" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">adr show</text>
+<text x="468" y="106" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">by ID · full panel</text>
+
+<!-- adr publish (teal/green) -->
+<rect x="558" y="64" width="148" height="54" rx="8" fill="#1c2128" stroke="#39d353" stroke-width="2"/>
+<text x="632" y="88" text-anchor="middle" fill="#39d353" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">adr publish</text>
+<text x="632" y="106" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">→ Confluence page</text>
+
+<!-- qa bug MODIFIED (red + badge) -->
+<rect x="820" y="64" width="210" height="54" rx="8" fill="#1c2128" stroke="#f85149" stroke-width="2"/>
+<text x="925" y="88" text-anchor="middle" fill="#f85149" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">qa bug</text>
+<text x="925" y="106" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">Jira + memory auto-save</text>
+<!-- MODIFIED badge -->
+<rect x="986" y="56" width="80" height="18" rx="5" fill="#ffa657"/>
+<text x="1026" y="69" text-anchor="middle" fill="#0d1117" font-size="10" font-weight="bold" font-family="'Segoe UI',sans-serif">✦ MODIFIED</text>
+
+<!-- ARROWS: commands → boxes -->
+<line x1="140" y1="118" x2="140" y2="148" stroke="#ffa657" stroke-width="1.5" marker-end="url(#ah-orange)"/>
+<line x1="304" y1="118" x2="304" y2="148" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+<line x1="468" y1="118" x2="468" y2="148" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+<line x1="632" y1="118" x2="632" y2="148" stroke="#39d353" stroke-width="1.5" marker-end="url(#ah-teal)"/>
+<line x1="925" y1="118" x2="925" y2="148" stroke="#f85149" stroke-width="1.5" marker-end="url(#ah-red)"/>
+
+<!-- ══ ADR SYSTEM BOX (x=66, y=148, w=716, h=232) ══ -->
+<rect x="66" y="148" width="716" height="232" rx="10" fill="#1c2128" stroke="#ffa657" stroke-width="2"/>
+<text x="424" y="170" text-anchor="middle" fill="#ffa657" font-size="14" font-weight="bold" font-family="'Segoe UI',sans-serif">ADR System  —  atlassian_cli/commands/adr.py  +  models/adr.py</text>
+
+<!-- ADR Model sub-box -->
+<rect x="78" y="180" width="316" height="118" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="236" y="200" text-anchor="middle" fill="#e6edf3" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">ADR Model  (Pydantic)</text>
+<text x="90" y="218" fill="#8b949e" font-size="10" font-family="monospace">id: str          # ADR-001</text>
+<text x="90" y="231" fill="#8b949e" font-size="10" font-family="monospace">title / context / decision / consequences</text>
+<text x="90" y="244" fill="#ffa657" font-size="10" font-family="monospace">status: AdrStatus  # proposed|accepted|...</text>
+<text x="90" y="257" fill="#ffa657" font-size="10" font-family="monospace">feature_id / memory_id / confluence_url</text>
+<text x="90" y="270" fill="#6e7681" font-size="10" font-family="monospace">created_at / updated_at: datetime</text>
+<text x="90" y="285" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">stored in ~/.atlassian-cli/adrs/ADR-001.json</text>
+
+<!-- LocalStorage sub-box -->
+<rect x="410" y="180" width="356" height="118" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="588" y="200" text-anchor="middle" fill="#e6edf3" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">LocalStorage  (adrs/)</text>
+<text x="422" y="218" fill="#6e7681" font-size="10" font-family="monospace">next_id("ADR", "adrs") → "ADR-001"</text>
+<text x="422" y="232" fill="#6e7681" font-size="10" font-family="monospace">save(adr, "adrs")  · load(ADR, "adrs", id)</text>
+<text x="422" y="246" fill="#6e7681" font-size="10" font-family="monospace">list_all(ADR, "adrs")</text>
+<text x="422" y="264" fill="#30363d" font-size="10" font-family="monospace">~/.atlassian-cli/adrs/</text>
+<text x="422" y="279" fill="#30363d" font-size="10" font-family="monospace">  ADR-001.json</text>
+<text x="422" y="293" fill="#30363d" font-size="10" font-family="monospace">  ADR-002.json  ...</text>
+
+<!-- adr add → memory (best-effort, bottom of ADR box) -->
+<rect x="78" y="308" width="500" height="60" rx="6" fill="#1e1400" stroke="#ffa657" stroke-width="1" stroke-dasharray="5,3"/>
+<text x="90" y="326" fill="#ffa657" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Memory auto-save  (best-effort — adr add only)</text>
+<text x="90" y="342" fill="#8b949e" font-size="10" font-family="monospace">MemoryStore.add(Memory(type=decision, tags=["adr"], feature_id=...,</text>
+<text x="90" y="356" fill="#8b949e" font-size="10" font-family="monospace">  content=f"ADR {id}: {title}. Decision: {decision}. ..."))</text>
+
+<!-- adr publish → Confluence label -->
+<rect x="590" y="308" width="180" height="60" rx="6" fill="#0d2b12" stroke="#39d353" stroke-width="1"/>
+<text x="680" y="326" text-anchor="middle" fill="#39d353" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">adr publish →</text>
+<text x="680" y="342" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">ConfluenceClient</text>
+<text x="680" y="356" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">.create_page()</text>
+
+<!-- ══ QA BUG MODIFICATION BOX (x=800, y=148, w=578, h=232) ══ -->
+<rect x="800" y="148" width="578" height="232" rx="10" fill="#1c2128" stroke="#f85149" stroke-width="2"/>
+<text x="1089" y="170" text-anchor="middle" fill="#f85149" font-size="14" font-weight="bold" font-family="'Segoe UI',sans-serif">atlassian qa bug  —  commands/qa.py  [modified]</text>
+
+<!-- Existing behavior sub-box -->
+<rect x="812" y="180" width="262" height="118" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="943" y="200" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Existing behavior (unchanged)</text>
+<text x="824" y="218" fill="#6e7681" font-size="10" font-family="monospace">JiraClient.create_bug(</text>
+<text x="824" y="231" fill="#6e7681" font-size="10" font-family="monospace">  summary, actual, expected, error</text>
+<text x="824" y="244" fill="#6e7681" font-size="10" font-family="monospace">) → bug_key</text>
+<text x="824" y="258" fill="#6e7681" font-size="10" font-family="monospace">jira.attach_file(bug_key, screenshot)</text>
+<text x="824" y="272" fill="#6e7681" font-size="10" font-family="monospace">jira.attach_file(bug_key, video)</text>
+<text x="824" y="286" fill="#6e7681" font-size="10" font-family="monospace">QA plan updated (bug_key → scenario)</text>
+
+<!-- New memory auto-save sub-box (new, orange) -->
+<rect x="1090" y="180" width="276" height="118" rx="6" fill="#1e1400" stroke="#ffa657" stroke-width="2"/>
+<!-- NEW badge -->
+<rect x="1290" y="172" width="58" height="18" rx="5" fill="#ffa657"/>
+<text x="1319" y="185" text-anchor="middle" fill="#0d1117" font-size="10" font-weight="bold" font-family="'Segoe UI',sans-serif">✦ NEW</text>
+<text x="1228" y="200" text-anchor="middle" fill="#ffa657" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Memory auto-save</text>
+<text x="1102" y="218" fill="#8b949e" font-size="10" font-family="monospace">MemoryStore.add(Memory(</text>
+<text x="1102" y="231" fill="#8b949e" font-size="10" font-family="monospace">  type = note</text>
+<text x="1102" y="244" fill="#ffa657" font-size="10" font-family="monospace">  tags = ["bug"]</text>
+<text x="1102" y="257" fill="#ffa657" font-size="10" font-family="monospace">  feature_id = plan.feature_id</text>
+<text x="1102" y="270" fill="#ffa657" font-size="10" font-family="monospace">  qa_id = qa_id</text>
+<text x="1102" y="283" fill="#8b949e" font-size="10" font-family="monospace">  content = "Bug {bug_key} ..."</text>
+
+<!-- best-effort label in qa bug box -->
+<rect x="812" y="308" width="554" height="60" rx="6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="1089" y="327" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Best-effort resilience — bug filing NEVER fails because Ollama is down</text>
+<text x="1089" y="344" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">try: mem_store.add(...)   except Exception: print("memory auto-save skipped — Ollama not available")</text>
+<text x="1089" y="360" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">Same pattern for  adr add  (ADR is always saved to LocalStorage regardless of Ollama state)</text>
+
+<!-- ══ ARROWS: boxes → infrastructure ══ -->
+
+<!-- ADR System → MemoryStore (orange dashed, best-effort) -->
+<line x1="328" y1="380" x2="328" y2="414" stroke="#ffa657" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ah-orange)"/>
+<text x="334" y="400" fill="#6e7681" font-size="9" font-family="'Segoe UI',sans-serif">best-effort</text>
+
+<!-- ADR System → ConfluenceClient (teal) -->
+<path d="M 680 380 C 680 396, 1110 396, 1110 414" stroke="#39d353" stroke-width="1.5" fill="none" marker-end="url(#ah-teal)"/>
+
+<!-- qa bug → MemoryStore (orange dashed) -->
+<line x1="900" y1="380" x2="900" y2="414" stroke="#ffa657" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ah-orange)"/>
+<text x="906" y="400" fill="#6e7681" font-size="9" font-family="'Segoe UI',sans-serif">best-effort</text>
+
+<!-- qa bug → Jira (gray) -->
+<path d="M 870 380 C 870 396, 1270 396, 1270 478" stroke="#8b949e" stroke-width="1.5" fill="none" marker-end="url(#ah-gray)"/>
+
+<!-- ══ SHARED INFRASTRUCTURE (y=414-548) ══ -->
+
+<!-- MemoryStore (Phase 4a reused) -->
+<rect x="66" y="414" width="980" height="132" rx="8" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+<text x="556" y="435" text-anchor="middle" fill="#bc8cff" font-size="14" font-weight="bold" font-family="'Segoe UI',sans-serif">MemoryStore  —  Phase 4a (existing infrastructure, reused)</text>
+<text x="556" y="452" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">atlassian_cli/storage/memory_store.py  ·  SQLite + ChromaDB + Ollama  ·  no changes in Phase 4b</text>
+
+<!-- Two input type sub-boxes -->
+<rect x="78" y="462" width="450" height="74" rx="5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="303" y="480" text-anchor="middle" fill="#ffa657" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">receives from  adr add</text>
+<text x="90" y="497" fill="#8b949e" font-size="10" font-family="monospace">type=decision  ·  tags=["adr"]  ·  feature_id=FEAT-001</text>
+<text x="90" y="511" fill="#8b949e" font-size="10" font-family="monospace">content: "ADR ADR-001: {title}. Decision: ..."</text>
+<text x="90" y="525" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">searchable: "what architecture decisions were made for auth?"</text>
+
+<rect x="546" y="462" width="484" height="74" rx="5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="788" y="480" text-anchor="middle" fill="#f85149" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">receives from  qa bug</text>
+<text x="558" y="497" fill="#8b949e" font-size="10" font-family="monospace">type=note  ·  tags=["bug"]  ·  feature_id=FEAT-001  ·  qa_id=QA-001</text>
+<text x="558" y="511" fill="#8b949e" font-size="10" font-family="monospace">content: "Bug BUG-123 filed: [QA-001] scenario '...'."</text>
+<text x="558" y="525" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">searchable: "what bugs were filed for login feature?"</text>
+
+<!-- ConfluenceClient (right) -->
+<rect x="1064" y="414" width="304" height="64" rx="8" fill="#1c2128" stroke="#39d353" stroke-width="1.5"/>
+<text x="1216" y="435" text-anchor="middle" fill="#39d353" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">ConfluenceClient</text>
+<text x="1076" y="453" fill="#6e7681" font-size="10" font-family="monospace">create_page(title="ADR: {title}", body=html)</text>
+<text x="1076" y="467" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">adr.confluence_url saved back to LocalStorage</text>
+
+<!-- Jira (right) -->
+<rect x="1064" y="490" width="304" height="56" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1" stroke-dasharray="5,3"/>
+<text x="1216" y="511" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">Jira  (existing)</text>
+<text x="1076" y="529" fill="#6e7681" font-size="10" font-family="monospace">create_bug + attach_file  ·  unmodified</text>
+
+<!-- ══ DESIGN DECISIONS (x=66, y=570, w=680, h=294) ══ -->
+<rect x="66" y="570" width="680" height="294" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="406" y="592" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">Design Decisions</text>
+
+<!-- Decision 1 -->
+<rect x="78" y="602" width="656" height="60" rx="5" fill="#0d1117" stroke="#ffa657" stroke-width="1"/>
+<text x="90" y="620" fill="#ffa657" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">① Best-effort memory saves — primary operation always succeeds</text>
+<text x="90" y="636" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">Wrapping MemoryStore.add() in try/except means Ollama being down never blocks bug filing</text>
+<text x="90" y="650" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">or ADR creation. Same pattern for both qa bug and adr add. Warning printed, not exit 1.</text>
+
+<!-- Decision 2 -->
+<rect x="78" y="670" width="656" height="48" rx="5" fill="#0d1117" stroke="#39d353" stroke-width="1"/>
+<text x="90" y="688" fill="#39d353" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">② ConfluenceClient reused without modification</text>
+<text x="90" y="704" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">_adr_to_confluence_body() lives in commands/adr.py — ADR-specific HTML stays with the command, not in confluence.py.</text>
+
+<!-- Decision 3 -->
+<rect x="78" y="726" width="656" height="48" rx="5" fill="#0d1117" stroke="#bc8cff" stroke-width="1"/>
+<text x="90" y="744" fill="#bc8cff" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">③ MemoryStore reused as-is from Phase 4a</text>
+<text x="90" y="760" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">No changes to memory_store.py. Phase 4b just adds two new callers (adr add, qa bug). Type system handles diversity.</text>
+
+<!-- Decision 4 -->
+<rect x="78" y="782" width="656" height="70" rx="5" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="90" y="800" fill="#8b949e" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">④ ADR status lifecycle</text>
+<text x="90" y="816" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">AdrStatus is a string enum: proposed → accepted → deprecated | superseded.</text>
+<text x="90" y="830" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">No automatic transitions — humans update status via: atlassian adr add --title "..." --status accepted</text>
+<text x="90" y="844" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">(delete old ADR + add new, or future adr update command in Phase 4c)</text>
+
+<!-- ══ LEGEND + ADR STATUS (x=762, y=570, w=606, h=294) ══ -->
+<rect x="762" y="570" width="606" height="294" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="1065" y="592" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">Legend  &amp;  ADR Status</text>
+
+<!-- Legend items -->
+<rect x="778" y="604" width="14" height="14" rx="3" fill="#1c2128" stroke="#ffa657" stroke-width="2"/>
+<text x="802" y="616" fill="#ffa657" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Write path (best-effort)</text>
+<text x="802" y="630" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">adr add → memory  ·  qa bug → memory  (orange dashed)</text>
+
+<rect x="778" y="644" width="14" height="14" rx="3" fill="#1c2128" stroke="#39d353" stroke-width="2"/>
+<text x="802" y="656" fill="#39d353" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Publish path</text>
+<text x="802" y="670" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">adr publish → ConfluenceClient.create_page()</text>
+
+<rect x="778" y="684" width="14" height="14" rx="3" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="802" y="696" fill="#58a6ff" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Read path (no Ollama)</text>
+<text x="802" y="710" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">adr list / show → LocalStorage only (always offline-safe)</text>
+
+<rect x="778" y="724" width="14" height="14" rx="3" fill="#1c2128" stroke="#f85149" stroke-width="2"/>
+<text x="802" y="736" fill="#f85149" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Bug path (modified)</text>
+<text x="802" y="750" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">qa bug → Jira (existing) + memory auto-save (new)</text>
+
+<rect x="778" y="764" width="14" height="14" rx="3" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+<text x="802" y="776" fill="#bc8cff" font-size="11" font-family="'Segoe UI',sans-serif">Phase 4a (existing, reused)</text>
+<text x="802" y="790" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">MemoryStore — no changes needed</text>
+
+<!-- ADR Status lifecycle diagram -->
+<rect x="778" y="808" width="576" height="48" rx="6" fill="#0d1117" stroke="#ffa657" stroke-width="1"/>
+<text x="778" y="808" fill="#0d1117" font-size="1">.</text>
+<!-- status flow: proposed → accepted → deprecated / superseded -->
+<rect x="792" y="818" width="88" height="22" rx="4" fill="#1c2128" stroke="#ffa657" stroke-width="1.5"/>
+<text x="836" y="833" text-anchor="middle" fill="#ffa657" font-size="10" font-family="monospace">proposed</text>
+<text x="884" y="832" fill="#8b949e" font-size="12" font-family="monospace">→</text>
+<rect x="898" y="818" width="88" height="22" rx="4" fill="#1c2128" stroke="#39d353" stroke-width="1.5"/>
+<text x="942" y="833" text-anchor="middle" fill="#39d353" font-size="10" font-family="monospace">accepted</text>
+<text x="990" y="832" fill="#8b949e" font-size="12" font-family="monospace">→</text>
+<rect x="1006" y="818" width="100" height="22" rx="4" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+<text x="1056" y="833" text-anchor="middle" fill="#8b949e" font-size="10" font-family="monospace">deprecated</text>
+<text x="1109" y="832" fill="#8b949e" font-size="12" font-family="monospace">/</text>
+<rect x="1120" y="818" width="100" height="22" rx="4" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+<text x="1170" y="833" text-anchor="middle" fill="#8b949e" font-size="10" font-family="monospace">superseded</text>
+<text x="1060" y="852" text-anchor="middle" fill="#30363d" font-size="9" font-family="'Segoe UI',sans-serif">set via  --status  flag on  adr add</text>
+
+</svg>
+</body>
+</html>
