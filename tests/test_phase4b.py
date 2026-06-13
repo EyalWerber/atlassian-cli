@@ -194,3 +194,169 @@ class TestBugMemoryAutoLink:
         assert result.exit_code == 0, result.output
         assert "BUG-999" in result.output
         assert "skipped" in result.output
+
+
+# ──────────────────────────────────────────────
+# Task 3: ADR add / list / show
+# ──────────────────────────────────────────────
+
+class TestADRCommands:
+    def test_add_saves_adr_and_memory(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+        from atlassian_cli.models.adr import ADR, AdrStatus
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        mock_store = MagicMock()
+        mock_store.next_id.return_value = "MEM-001"
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.MemoryStore", lambda **kwargs: mock_store
+        )
+        mock_settings = MagicMock()
+        monkeypatch.setattr("atlassian_cli.commands.adr.get_settings", lambda: mock_settings)
+
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, [
+            "add",
+            "--title", "Use SQLite for persistence",
+            "--context", "Need to store records locally without a server",
+            "--decision", "Use Python stdlib sqlite3 module",
+            "--consequences", "Simple deployment; single-user only",
+            "--feature", "FEAT-001",
+        ])
+
+        assert result.exit_code == 0, result.output
+        assert "ADR-001" in result.output
+        assert "MEM-001" in result.output
+
+        loaded = LocalStorage(base_dir=tmp_path).load(ADR, "adrs", "ADR-001")
+        assert loaded is not None
+        assert loaded.title == "Use SQLite for persistence"
+        assert loaded.memory_id == "MEM-001"
+        assert loaded.feature_id == "FEAT-001"
+        assert loaded.status == AdrStatus.proposed
+
+        mock_store.add.assert_called_once()
+        mem_arg = mock_store.add.call_args[0][0]
+        assert mem_arg.type.value == "decision"
+        assert "adr" in mem_arg.tags
+        assert "ADR-001" in mem_arg.content
+
+    def test_add_without_memory_when_ollama_down(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+        from atlassian_cli.models.adr import ADR
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        def failing_store(**kwargs):
+            raise RuntimeError("Ollama not available")
+        monkeypatch.setattr("atlassian_cli.commands.adr.MemoryStore", failing_store)
+        mock_settings = MagicMock()
+        monkeypatch.setattr("atlassian_cli.commands.adr.get_settings", lambda: mock_settings)
+
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, [
+            "add",
+            "--title", "Offline decision",
+            "--context", "ctx",
+            "--decision", "decided",
+            "--consequences", "cons",
+        ])
+
+        assert result.exit_code == 0, result.output
+        assert "ADR-001" in result.output
+        assert "skipped" in result.output
+
+        loaded = LocalStorage(base_dir=tmp_path).load(ADR, "adrs", "ADR-001")
+        assert loaded is not None
+        assert loaded.memory_id is None
+
+    def test_list_shows_all_adrs(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+        from atlassian_cli.models.adr import ADR
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        storage = LocalStorage(base_dir=tmp_path)
+        now = datetime.now(timezone.utc)
+        for i in range(1, 3):
+            storage.save(ADR(
+                id=f"ADR-00{i}", title=f"Decision {i}", context="c",
+                decision="d", consequences="q",
+                feature_id="FEAT-001" if i == 1 else None,
+                created_at=now, updated_at=now,
+            ), "adrs")
+
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, ["list"])
+        assert result.exit_code == 0
+        assert "ADR-001" in result.output
+        assert "ADR-002" in result.output
+
+    def test_list_filters_by_feature(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+        from atlassian_cli.models.adr import ADR
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        storage = LocalStorage(base_dir=tmp_path)
+        now = datetime.now(timezone.utc)
+        storage.save(ADR(id="ADR-001", title="D1", context="c", decision="d", consequences="q", feature_id="FEAT-001", created_at=now, updated_at=now), "adrs")
+        storage.save(ADR(id="ADR-002", title="D2", context="c", decision="d", consequences="q", feature_id="FEAT-002", created_at=now, updated_at=now), "adrs")
+
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, ["list", "--feature", "FEAT-001"])
+        assert result.exit_code == 0
+        assert "ADR-001" in result.output
+        assert "ADR-002" not in result.output
+
+    def test_show_prints_all_fields(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+        from atlassian_cli.models.adr import ADR, AdrStatus
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        storage = LocalStorage(base_dir=tmp_path)
+        now = datetime.now(timezone.utc)
+        storage.save(ADR(
+            id="ADR-001",
+            title="Use ChromaDB",
+            context="Need semantic search",
+            decision="Use ChromaDB 0.4+",
+            consequences="Local only; 768-dim vectors",
+            feature_id="FEAT-001",
+            memory_id="MEM-001",
+            status=AdrStatus.accepted,
+            created_at=now,
+            updated_at=now,
+        ), "adrs")
+
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, ["show", "ADR-001"])
+        assert result.exit_code == 0
+        assert "Use ChromaDB" in result.output
+        assert "accepted" in result.output
+        assert "FEAT-001" in result.output
+        assert "MEM-001" in result.output
+
+    def test_show_not_found(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, ["show", "ADR-999"])
+        assert result.exit_code == 1
+        assert "not found" in result.output
