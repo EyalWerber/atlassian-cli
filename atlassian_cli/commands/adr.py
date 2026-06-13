@@ -27,7 +27,7 @@ def _adr_to_confluence_body(adr: ADR) -> str:
                 .replace("\n", "<br/>")
         )
     return "\n".join([
-        f"<h2>Status</h2><p>{adr.status.value}</p>",
+        f"<h2>Status</h2><p>{safe(adr.status.value)}</p>",
         f"<h2>Context</h2><p>{safe(adr.context)}</p>",
         f"<h2>Decision</h2><p>{safe(adr.decision)}</p>",
         f"<h2>Consequences</h2><p>{safe(adr.consequences)}</p>",
