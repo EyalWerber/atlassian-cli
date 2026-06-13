@@ -104,7 +104,7 @@ def list_memories(
     table.add_column("Feature")
     table.add_column("Created")
     for m in memories:
-        snippet = m.content[:57] + "..." if len(m.content) > 60 else m.content
+        snippet = m.content[:57] + "..." if len(m.content) > 57 else m.content
         table.add_row(
             m.id,
             m.type.value,
@@ -138,7 +138,7 @@ def search(
     table.add_column("Content", max_width=60)
     table.add_column("Feature")
     for i, m in enumerate(memories, 1):
-        snippet = m.content[:57] + "..." if len(m.content) > 60 else m.content
+        snippet = m.content[:57] + "..." if len(m.content) > 57 else m.content
         table.add_row(str(i), m.id, m.type.value, snippet, m.feature_id or "—")
     console.print(table)
 
@@ -150,7 +150,7 @@ def delete(id: str = typer.Argument(..., help="e.g. MEM-001")) -> None:
     if not memory:
         console.print(f"[red]✗[/red]  Memory [bold]{id}[/bold] not found")
         raise typer.Exit(1)
-    snippet = memory.content[:60] + "..." if len(memory.content) > 60 else memory.content
+    snippet = memory.content[:57] + "..." if len(memory.content) > 57 else memory.content
     console.print(f"[dim]{snippet}[/dim]")
     if not typer.confirm(f"Delete {id}?", default=False):
         console.print("[dim]Cancelled.[/dim]")
