@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>body { background: #0d1117; margin: 0; padding: 0; }</style>
+</head>
+<body>
+<svg width="1400" height="900" viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="ah-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#8b949e"/></marker>
+  <marker id="ah-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#58a6ff"/></marker>
+  <marker id="ah-orange" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"><polygon points="0 0,10 4,0 8" fill="#ffa657"/></marker>
+  <marker id="ah-purple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#bc8cff"/></marker>
+  <marker id="ah-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f85149"/></marker>
+</defs>
+
+<rect width="1400" height="900" fill="#0d1117"/>
+
+<!-- ══ TITLE ══ -->
+<text x="560" y="34" text-anchor="middle" fill="#e6edf3" font-size="22" font-weight="bold" font-family="'Segoe UI',sans-serif">atlassian-cli  Phase 4a — Memory Subsystem</text>
+<text x="560" y="54" text-anchor="middle" fill="#6e7681" font-size="12" font-family="'Segoe UI',sans-serif">SQLite + ChromaDB + Ollama embeddings  ·  5 CLI commands  ·  atomic dual-write</text>
+
+<!-- ══ CONFIG PANEL (top-right) ══ -->
+<rect x="1062" y="62" width="316" height="128" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="1220" y="82" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">config.py / .env</text>
+<text x="1076" y="101" fill="#6e7681" font-size="10" font-family="monospace">MEMORY_DB_PATH</text>
+<text x="1082" y="115" fill="#8b949e" font-size="10" font-family="monospace">~/.atlassian-cli/memory.db</text>
+<text x="1076" y="132" fill="#6e7681" font-size="10" font-family="monospace">MEMORY_VECTOR_PATH</text>
+<text x="1082" y="146" fill="#8b949e" font-size="10" font-family="monospace">~/.atlassian-cli/vectors/</text>
+<text x="1076" y="163" fill="#6e7681" font-size="10" font-family="monospace">OLLAMA_EMBED_MODEL</text>
+<text x="1082" y="177" fill="#8b949e" font-size="10" font-family="monospace">nomic-embed-text</text>
+
+<!-- ══ CLI COMMANDS (y=64-122) ══ -->
+
+<!-- memory add (orange) -->
+<rect x="86" y="64" width="148" height="58" rx="8" fill="#1c2128" stroke="#ffa657" stroke-width="2"/>
+<text x="160" y="89" text-anchor="middle" fill="#ffa657" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">memory add</text>
+<text x="160" y="107" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">write · embed first</text>
+
+<!-- memory search (purple) -->
+<rect x="250" y="64" width="162" height="58" rx="8" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+<text x="331" y="89" text-anchor="middle" fill="#bc8cff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">memory search</text>
+<text x="331" y="107" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">semantic · ChromaDB</text>
+
+<!-- memory list (blue) -->
+<rect x="428" y="64" width="148" height="58" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="502" y="89" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">memory list</text>
+<text x="502" y="107" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">SQLite only · offline</text>
+
+<!-- memory show (blue) -->
+<rect x="592" y="64" width="148" height="58" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="666" y="89" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">memory show</text>
+<text x="666" y="107" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">by ID · full detail</text>
+
+<!-- memory delete (red) -->
+<rect x="756" y="64" width="162" height="58" rx="8" fill="#1c2128" stroke="#f85149" stroke-width="2"/>
+<text x="837" y="89" text-anchor="middle" fill="#f85149" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">memory delete</text>
+<text x="837" y="107" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">both stores · confirm</text>
+
+<!-- ARROWS: Commands → MemoryStore -->
+<line x1="160" y1="122" x2="160" y2="152" stroke="#ffa657" stroke-width="1.5" marker-end="url(#ah-orange)"/>
+<line x1="331" y1="122" x2="331" y2="152" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#ah-purple)"/>
+<line x1="502" y1="122" x2="502" y2="152" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+<line x1="666" y1="122" x2="666" y2="152" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+<line x1="837" y1="122" x2="837" y2="152" stroke="#f85149" stroke-width="1.5" marker-end="url(#ah-red)"/>
+
+<!-- ══ MEMORY STORE (y=152-372, h=220) ══ -->
+<rect x="66" y="152" width="980" height="220" rx="10" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+<text x="556" y="174" text-anchor="middle" fill="#bc8cff" font-size="15" font-weight="bold" font-family="'Segoe UI',sans-serif">MemoryStore</text>
+<text x="556" y="190" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">atlassian_cli/storage/memory_store.py  ·  single interface to SQLite + ChromaDB  ·  commands never touch stores directly</text>
+
+<!-- Method boxes Row 1 (y=202, h=48, w=168, gap=20) -->
+<!-- 3*168+2*20=544; start_x = 66+(980-544)/2 = 284 -->
+
+<!-- next_id -->
+<rect x="284" y="202" width="168" height="48" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="368" y="223" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="bold" font-family="monospace">next_id()</text>
+<text x="368" y="240" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">→ "MEM-001", "MEM-002" …</text>
+
+<!-- add -->
+<rect x="472" y="202" width="168" height="48" rx="6" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+<text x="556" y="223" text-anchor="middle" fill="#ffa657" font-size="12" font-weight="bold" font-family="monospace">add(memory)</text>
+<text x="556" y="240" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">embed → SQLite → ChromaDB</text>
+
+<!-- get -->
+<rect x="660" y="202" width="168" height="48" rx="6" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="744" y="223" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold" font-family="monospace">get(id)</text>
+<text x="744" y="240" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">SQLite lookup by ID</text>
+
+<!-- Method boxes Row 2 (y=264, h=48) -->
+
+<!-- list -->
+<rect x="284" y="264" width="168" height="48" rx="6" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="368" y="285" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold" font-family="monospace">list(...)</text>
+<text x="368" y="302" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">SQLite SELECT · no Ollama</text>
+
+<!-- search -->
+<rect x="472" y="264" width="168" height="48" rx="6" fill="#161b22" stroke="#bc8cff" stroke-width="1.5"/>
+<text x="556" y="285" text-anchor="middle" fill="#bc8cff" font-size="12" font-weight="bold" font-family="monospace">search(query)</text>
+<text x="556" y="302" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">embed → ChromaDB → SQLite</text>
+
+<!-- delete -->
+<rect x="660" y="264" width="168" height="48" rx="6" fill="#161b22" stroke="#f85149" stroke-width="1.5"/>
+<text x="744" y="285" text-anchor="middle" fill="#f85149" font-size="12" font-weight="bold" font-family="monospace">delete(id)</text>
+<text x="744" y="302" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">SQLite + ChromaDB (best-effort)</text>
+
+<!-- ══ MEMORY MODEL PANEL (right column, y=152-394) ══ -->
+<rect x="1062" y="208" width="316" height="262" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="1220" y="228" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">Memory Model</text>
+<text x="1076" y="248" fill="#6e7681" font-size="10" font-family="monospace">class MemoryType(str, Enum):</text>
+<text x="1082" y="262" fill="#3fb950" font-size="10" font-family="monospace">  decision  context  note</text>
+<text x="1076" y="280" fill="#6e7681" font-size="10" font-family="monospace">class Memory(BaseModel):</text>
+<text x="1082" y="294" fill="#8b949e" font-size="10" font-family="monospace">  id:         str       # MEM-001</text>
+<text x="1082" y="308" fill="#8b949e" font-size="10" font-family="monospace">  content:    str</text>
+<text x="1082" y="322" fill="#8b949e" font-size="10" font-family="monospace">  type:       MemoryType</text>
+<text x="1082" y="336" fill="#8b949e" font-size="10" font-family="monospace">  tags:       list[str]</text>
+<text x="1082" y="350" fill="#ffa657" font-size="10" font-family="monospace">  feature_id: Optional[str]</text>
+<text x="1082" y="364" fill="#ffa657" font-size="10" font-family="monospace">  prd_id:     Optional[str]</text>
+<text x="1082" y="378" fill="#ffa657" font-size="10" font-family="monospace">  plan_id:    Optional[str]</text>
+<text x="1082" y="392" fill="#ffa657" font-size="10" font-family="monospace">  qa_id:      Optional[str]</text>
+<text x="1082" y="406" fill="#8b949e" font-size="10" font-family="monospace">  created_at: datetime</text>
+<text x="1082" y="420" fill="#8b949e" font-size="10" font-family="monospace">  updated_at: datetime</text>
+<text x="1220" y="456" text-anchor="middle" fill="#6e7681" font-size="9" font-family="'Segoe UI',sans-serif">orange fields = feature scoping (Phase 4b)</text>
+
+<!-- ══ ARROWS: MemoryStore → Stores ══ -->
+<!-- To SQLite (blue): from x=256, y=372 -->
+<line x1="256" y1="372" x2="256" y2="396" stroke="#58a6ff" stroke-width="2" marker-end="url(#ah-blue)"/>
+<!-- To ChromaDB (purple): from x=634, y=372 -->
+<line x1="634" y1="372" x2="634" y2="396" stroke="#bc8cff" stroke-width="2" marker-end="url(#ah-purple)"/>
+<!-- To OllamaClient (gray): from x=942, y=372 -->
+<line x1="942" y1="372" x2="942" y2="396" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ah-gray)"/>
+<text x="956" y="387" fill="#6e7681" font-size="9" font-family="'Segoe UI',sans-serif">embed()</text>
+
+<!-- ══ SQLITE BOX (x=66, y=396, w=382, h=172) ══ -->
+<rect x="66" y="396" width="382" height="172" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
+<text x="246" y="416" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="bold" font-family="'Segoe UI',sans-serif">SQLite</text>
+<!-- Badge -->
+<rect x="148" y="404" width="110" height="18" rx="4" fill="#122215"/>
+<text x="203" y="416" text-anchor="middle" fill="#3fb950" font-size="10" font-weight="bold" font-family="'Segoe UI',sans-serif">Source of Truth</text>
+
+<!-- memories table sub-box -->
+<rect x="78" y="424" width="358" height="60" rx="5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="90" y="441" fill="#e6edf3" font-size="11" font-weight="bold" font-family="monospace">memories</text>
+<text x="90" y="456" fill="#6e7681" font-size="10" font-family="monospace">id · content · type · tags</text>
+<text x="90" y="470" fill="#6e7681" font-size="10" font-family="monospace">feature_id · prd_id · plan_id · qa_id · timestamps</text>
+
+<!-- memories_fts sub-box -->
+<rect x="78" y="492" width="358" height="34" rx="5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="90" y="508" fill="#8b949e" font-size="11" font-weight="bold" font-family="monospace">memories_fts  (FTS5)</text>
+<text x="90" y="522" fill="#6e7681" font-size="10" font-family="monospace">id · content  →  keyword search ready</text>
+
+<!-- file path -->
+<text x="257" y="554" text-anchor="middle" fill="#30363d" font-size="10" font-family="monospace">~/.atlassian-cli/memory.db</text>
+
+<!-- ══ CHROMADB BOX (x=466, y=396, w=338, h=172) ══ -->
+<rect x="466" y="396" width="338" height="172" rx="8" fill="#1c2128" stroke="#bc8cff" stroke-width="1.5"/>
+<text x="635" y="416" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="bold" font-family="'Segoe UI',sans-serif">ChromaDB</text>
+<!-- Badge -->
+<rect x="560" y="404" width="110" height="18" rx="4" fill="#1a0e2e"/>
+<text x="615" y="416" text-anchor="middle" fill="#bc8cff" font-size="10" font-weight="bold" font-family="'Segoe UI',sans-serif">Vector Index</text>
+
+<!-- collection sub-box -->
+<rect x="478" y="424" width="314" height="60" rx="5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="490" y="441" fill="#e6edf3" font-size="11" font-weight="bold" font-family="monospace">"memories"  collection</text>
+<text x="490" y="456" fill="#6e7681" font-size="10" font-family="monospace">768-dim embeddings  (nomic-embed-text)</text>
+<text x="490" y="470" fill="#6e7681" font-size="10" font-family="monospace">metadata: type · feature_id · prd_id · ...</text>
+
+<!-- query example sub-box -->
+<rect x="478" y="492" width="314" height="34" rx="5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="490" y="508" fill="#8b949e" font-size="10" font-family="monospace">where={"feature_id": {"$eq": "FEAT-001"}}</text>
+<text x="490" y="522" fill="#6e7681" font-size="10" font-family="monospace">scoped semantic search per feature</text>
+
+<!-- file path -->
+<text x="635" y="554" text-anchor="middle" fill="#30363d" font-size="10" font-family="monospace">~/.atlassian-cli/vectors/</text>
+
+<!-- ══ OLLAMA INTEGRATION COLUMN (x=822) ══ -->
+
+<!-- OllamaClient box -->
+<rect x="822" y="396" width="238" height="68" rx="8" fill="#1c2128" stroke="#e6edf3" stroke-width="1.5"/>
+<text x="941" y="416" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">OllamaClient</text>
+<text x="834" y="434" fill="#8b949e" font-size="10" font-family="monospace">embed(text) → list[float]</text>
+<text x="834" y="450" fill="#6e7681" font-size="10" font-family="monospace">POST /api/embeddings  ·  timeout 30s</text>
+
+<!-- Arrow: OllamaClient → Ollama -->
+<line x1="941" y1="464" x2="941" y2="490" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ah-gray)"/>
+
+<!-- Ollama external (dashed) -->
+<rect x="822" y="490" width="238" height="76" rx="8" fill="#161b22" stroke="#8b949e" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="941" y="511" text-anchor="middle" fill="#8b949e" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">Ollama</text>
+<text x="834" y="529" fill="#6e7681" font-size="10" font-family="monospace">model: nomic-embed-text</text>
+<text x="834" y="544" fill="#6e7681" font-size="10" font-family="monospace">output: 768-dim float vector</text>
+<text x="834" y="558" fill="#30363d" font-size="10" font-family="monospace">http://localhost:11434</text>
+
+<!-- ══ LOCAL STORAGE PANEL (right column, y=396-568) ══ -->
+<rect x="1078" y="396" width="300" height="172" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="1228" y="416" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">Local Storage</text>
+<text x="1228" y="435" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">auto-created on first  memory add</text>
+
+<rect x="1090" y="444" width="276" height="34" rx="5" fill="#0d1117" stroke="#30363d"/>
+<text x="1102" y="460" fill="#3fb950" font-size="10" font-family="monospace">~/.atlassian-cli/</text>
+<text x="1102" y="474" fill="#6e7681" font-size="10" font-family="monospace">  memory.db      ← SQLite</text>
+
+<rect x="1090" y="486" width="276" height="34" rx="5" fill="#0d1117" stroke="#30363d"/>
+<text x="1102" y="502" fill="#bc8cff" font-size="10" font-family="monospace">~/.atlassian-cli/</text>
+<text x="1102" y="516" fill="#6e7681" font-size="10" font-family="monospace">  vectors/       ← ChromaDB</text>
+
+<text x="1228" y="542" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">one-time setup:</text>
+<text x="1228" y="556" text-anchor="middle" fill="#8b949e" font-size="10" font-family="monospace">ollama pull nomic-embed-text</text>
+
+<!-- ══ DESIGN DECISIONS (y=592-878) ══ -->
+<rect x="66" y="592" width="688" height="286" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="410" y="614" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">Design Decisions</text>
+
+<!-- Decision 1: Atomic Write -->
+<rect x="78" y="624" width="664" height="78" rx="6" fill="#0d1117" stroke="#ffa657" stroke-width="1"/>
+<text x="90" y="642" fill="#ffa657" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">① Atomic Write Pattern  —  no orphaned records</text>
+<text x="90" y="659" fill="#8b949e" font-size="10" font-family="monospace">embed(text)  →  SQLite INSERT (uncommitted)  →  ChromaDB upsert  →  SQLite commit</text>
+<text x="90" y="675" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">If Ollama is down: nothing is written (embed fails first). If ChromaDB fails: SQLite never commits.</text>
+<text x="90" y="691" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">Result: both stores are always consistent, or neither has the record.</text>
+
+<!-- Decision 2: Stale Vector Safety -->
+<rect x="78" y="710" width="664" height="62" rx="6" fill="#0d1117" stroke="#bc8cff" stroke-width="1"/>
+<text x="90" y="728" fill="#bc8cff" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">② Stale Vector Safety  —  delete() is best-effort on ChromaDB</text>
+<text x="90" y="745" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">SQLite delete is authoritative. ChromaDB removal is wrapped in try/except (harmless if it fails).</text>
+<text x="90" y="761" fill="#8b949e" font-size="10" font-family="monospace">search(): [m for id in ids if (m := self.get(id)) is not None]  →  stale vectors auto-filtered</text>
+
+<!-- Decision 3: SQLite-only reads -->
+<rect x="78" y="780" width="664" height="46" rx="6" fill="#0d1117" stroke="#58a6ff" stroke-width="1"/>
+<text x="90" y="798" fill="#58a6ff" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">③ SQLite-only for  list / show / get</text>
+<text x="90" y="815" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">Read-only commands never call Ollama. Works offline. Only  add  and  search  require Ollama.</text>
+
+<!-- Decision 4: ChromaDB n_results guard -->
+<rect x="78" y="834" width="664" height="32" rx="6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="90" y="851" fill="#8b949e" font-size="10" font-family="monospace">n = min(limit, collection.count())  →  prevents ChromaDB error when fewer docs than requested</text>
+<text x="90" y="862" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">Plus try/except around filtered queries (ChromaDB throws when filtered result set is empty).</text>
+
+<!-- ══ LEGEND (y=592-878) ══ -->
+<rect x="770" y="592" width="308" height="286" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="924" y="614" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">Legend</text>
+
+<!-- Write path -->
+<rect x="786" y="628" width="14" height="14" rx="3" fill="#1c2128" stroke="#ffa657" stroke-width="2"/>
+<text x="810" y="640" fill="#ffa657" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Write path</text>
+<text x="810" y="656" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">memory add  →  add()  →  embed + SQLite + ChromaDB</text>
+
+<!-- Search path -->
+<rect x="786" y="670" width="14" height="14" rx="3" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+<text x="810" y="682" fill="#bc8cff" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Search path</text>
+<text x="810" y="698" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">memory search  →  search()  →  embed + ChromaDB + SQLite</text>
+
+<!-- Read path -->
+<rect x="786" y="712" width="14" height="14" rx="3" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="810" y="724" fill="#58a6ff" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Read path  (no Ollama)</text>
+<text x="810" y="740" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">memory list / show  →  list() / get()  →  SQLite only</text>
+
+<!-- Delete path -->
+<rect x="786" y="754" width="14" height="14" rx="3" fill="#1c2128" stroke="#f85149" stroke-width="2"/>
+<text x="810" y="766" fill="#f85149" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Delete path</text>
+<text x="810" y="782" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">memory delete  →  delete()  →  SQLite (commit) + ChromaDB (try)</text>
+
+<!-- External service -->
+<rect x="786" y="796" width="14" height="14" rx="3" fill="#161b22" stroke="#8b949e" stroke-width="1" stroke-dasharray="4,2"/>
+<text x="810" y="808" fill="#8b949e" font-size="11" font-family="'Segoe UI',sans-serif">External service  (dashed border)</text>
+<text x="810" y="824" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">Ollama  —  must be running for  add  and  search</text>
+
+<!-- Memory ID format note -->
+<rect x="778" y="842" width="292" height="30" rx="5" fill="#0d1117" stroke="#30363d"/>
+<text x="924" y="857" text-anchor="middle" fill="#6e7681" font-size="10" font-family="monospace">IDs: MEM-001  MEM-002  MEM-003 …</text>
+<text x="924" y="868" text-anchor="middle" fill="#30363d" font-size="9" font-family="'Segoe UI',sans-serif">generated via SQLite MAX(CAST(SUBSTR(id,5) AS INTEGER))</text>
+
+<!-- ══ PHASE BADGE (top-right of right column) ══ -->
+<rect x="1090" y="592" width="288" height="286" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="1234" y="614" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">Phase Roadmap</text>
+
+<text x="1102" y="636" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">✓ Phase 1</text>
+<text x="1156" y="636" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">CLI · Atlassian · PRD · Confluence</text>
+<text x="1102" y="656" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">✓ Phase 2</text>
+<text x="1156" y="656" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">Ollama planning · Jira decomposition</text>
+<text x="1102" y="676" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">✓ Phase 3</text>
+<text x="1156" y="676" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">QA planning · Playwright · bug filing</text>
+
+<!-- Phase 4a highlight badge -->
+<rect x="1090" y="690" width="288" height="56" rx="6" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+<rect x="1140" y="680" width="100" height="20" rx="5" fill="#bc8cff"/>
+<text x="1190" y="694" text-anchor="middle" fill="#0d1117" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">4a  ✦ THIS</text>
+<text x="1234" y="712" text-anchor="middle" fill="#bc8cff" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">Memory Subsystem</text>
+<text x="1234" y="729" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">SQLite + ChromaDB + Ollama</text>
+<text x="1234" y="742" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">5 commands · atomic writes</text>
+
+<text x="1102" y="770" fill="#30363d" font-size="11" font-family="'Segoe UI',sans-serif">  Phase 4b</text>
+<text x="1156" y="770" fill="#30363d" font-size="10" font-family="'Segoe UI',sans-serif">Bug → memory auto-link</text>
+<text x="1102" y="790" fill="#30363d" font-size="11" font-family="'Segoe UI',sans-serif">  Phase 4c</text>
+<text x="1156" y="790" fill="#30363d" font-size="10" font-family="'Segoe UI',sans-serif">CLAUDE.md automation</text>
+<text x="1102" y="810" fill="#30363d" font-size="11" font-family="'Segoe UI',sans-serif">  Phase 5</text>
+<text x="1156" y="810" fill="#30363d" font-size="10" font-family="'Segoe UI',sans-serif">Autonomous workflows · Docker</text>
+
+<text x="1234" y="848" text-anchor="middle" fill="#30363d" font-size="10" font-family="'Segoe UI',sans-serif">atlassian-cli  ·  EyalWerber  ·  2026-06-13</text>
+<text x="1234" y="862" text-anchor="middle" fill="#30363d" font-size="10" font-family="'Segoe UI',sans-serif">Claude Code + Anthropic</text>
+
+</svg>
+</body>
+</html>
