@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import ValidationError, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import typer
@@ -25,6 +27,9 @@ class Settings(BaseSettings):
     memory_vector_path: str = "~/.atlassian-cli/vectors/"
     ollama_embed_model: str = "nomic-embed-text"
     qa_base_url: str = ""
+    memory_backend: str = "local"
+    turso_url: Optional[str] = None
+    turso_auth_token: Optional[str] = None
 
 
 def get_settings() -> Settings:

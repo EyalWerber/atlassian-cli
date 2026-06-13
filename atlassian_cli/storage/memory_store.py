@@ -6,23 +6,49 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+try:
+    import libsql_experimental as libsql
+except ImportError:
+    libsql = None  # type: ignore[assignment]
+
 from atlassian_cli.integrations.ollama import OllamaClient
 from atlassian_cli.models.memory import Memory, MemoryType
 
 
 class MemoryStore:
-    def __init__(self, db_path: str, vector_path: str, ollama: OllamaClient):
-        self._db_path = Path(db_path).expanduser()
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._vector_path = Path(vector_path).expanduser()
+    def __init__(
+        self,
+        db_path: str,
+        vector_path: str,
+        ollama: OllamaClient,
+        turso_url: Optional[str] = None,
+        turso_auth_token: Optional[str] = None,
+    ):
         self._ollama = ollama
-        self._conn = sqlite3.connect(str(self._db_path))
-        self._conn.row_factory = sqlite3.Row
+        self._is_turso = bool(turso_url)
+
+        if self._is_turso:
+            if libsql is None:
+                raise RuntimeError(
+                    "libsql-experimental is required for Turso mode. "
+                    "Run: pip install libsql-experimental"
+                )
+            self._conn = libsql.connect(
+                database=turso_url,
+                auth_token=turso_auth_token,
+            )
+        else:
+            self._db_path = Path(db_path).expanduser()
+            self._db_path.parent.mkdir(parents=True, exist_ok=True)
+            self._conn = sqlite3.connect(str(self._db_path))
+            self._conn.row_factory = sqlite3.Row
+
+        self._vector_path = Path(vector_path).expanduser()
         self._init_db()
         self._init_chroma()
 
     def _init_db(self) -> None:
-        self._conn.executescript("""
+        create_memories = """
             CREATE TABLE IF NOT EXISTS memories (
                 id         TEXT PRIMARY KEY,
                 content    TEXT NOT NULL,
@@ -34,17 +60,39 @@ class MemoryStore:
                 qa_id      TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
-            );
-            CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts
-                USING fts5(id UNINDEXED, content);
-        """)
-        self._conn.commit()
+            )
+        """
+        if self._is_turso:
+            self._conn.execute(create_memories)
+            self._conn.commit()
+        else:
+            self._conn.executescript(f"""
+                {create_memories};
+                CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts
+                    USING fts5(id UNINDEXED, content);
+            """)
+            self._conn.commit()
 
     def _init_chroma(self) -> None:
         import chromadb
         self._vector_path.mkdir(parents=True, exist_ok=True)
         client = chromadb.PersistentClient(path=str(self._vector_path))
         self._collection = client.get_or_create_collection("memories")
+
+    def _rows(self, query: str, params: tuple = ()) -> list:
+        cursor = self._conn.execute(query, params)
+        if self._is_turso:
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, row)) for row in cursor.fetchall()]
+        return cursor.fetchall()
+
+    def _row(self, query: str, params: tuple = ()) -> Optional[dict]:
+        cursor = self._conn.execute(query, params)
+        if self._is_turso:
+            cols = [d[0] for d in cursor.description]
+            row = cursor.fetchone()
+            return dict(zip(cols, row)) if row else None
+        return cursor.fetchone()
 
     def next_id(self) -> str:
         row = self._conn.execute(
@@ -53,7 +101,6 @@ class MemoryStore:
         return f"MEM-{row[0]:03d}"
 
     def add(self, memory: Memory) -> Memory:
-        # Embed first — if Ollama is down, nothing is written anywhere
         vector = self._ollama.embed(memory.content)
         metadata = {
             "type": memory.type.value,
@@ -63,7 +110,6 @@ class MemoryStore:
             "plan_id": memory.plan_id or "",
             "qa_id": memory.qa_id or "",
         }
-        # Write to SQLite (not yet committed)
         self._conn.execute(
             """INSERT INTO memories
                (id, content, type, tags, feature_id, prd_id, plan_id, qa_id, created_at, updated_at)
@@ -74,25 +120,22 @@ class MemoryStore:
                 memory.created_at.isoformat(), memory.updated_at.isoformat(),
             ),
         )
-        self._conn.execute(
-            "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
-            (memory.id, memory.content),
-        )
-        # Upsert to ChromaDB — if this fails, SQLite hasn't committed yet
+        if not self._is_turso:
+            self._conn.execute(
+                "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
+                (memory.id, memory.content),
+            )
         self._collection.upsert(
             ids=[memory.id],
             embeddings=[vector],
             documents=[memory.content],
             metadatas=[metadata],
         )
-        # Only commit SQLite after ChromaDB succeeds
         self._conn.commit()
         return memory
 
     def get(self, id: str) -> Optional[Memory]:
-        row = self._conn.execute(
-            "SELECT * FROM memories WHERE id = ?", (id,)
-        ).fetchone()
+        row = self._row("SELECT * FROM memories WHERE id = ?", (id,))
         return self._row_to_memory(row) if row else None
 
     def list(
@@ -116,7 +159,7 @@ class MemoryStore:
             params.append(f'%"{escaped}"%')
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
-        return [self._row_to_memory(r) for r in self._conn.execute(query, params).fetchall()]
+        return [self._row_to_memory(r) for r in self._rows(query, tuple(params))]
 
     def search(self, query: str, limit: int = 5, feature_id: Optional[str] = None) -> list[Memory]:
         vector = self._ollama.embed(query)
@@ -140,7 +183,8 @@ class MemoryStore:
         if not self._conn.execute("SELECT id FROM memories WHERE id = ?", (id,)).fetchone():
             return False
         self._conn.execute("DELETE FROM memories WHERE id = ?", (id,))
-        self._conn.execute("DELETE FROM memories_fts WHERE id = ?", (id,))
+        if not self._is_turso:
+            self._conn.execute("DELETE FROM memories_fts WHERE id = ?", (id,))
         self._conn.commit()
         try:
             self._collection.delete(ids=[id])
@@ -148,7 +192,108 @@ class MemoryStore:
             pass
         return True
 
-    def _row_to_memory(self, row: sqlite3.Row) -> Memory:
+    def push_to_turso(self, turso_url: str, turso_auth_token: str) -> int:
+        if libsql is None:
+            raise RuntimeError(
+                "libsql-experimental is required: pip install libsql-experimental"
+            )
+        remote = libsql.connect(database=turso_url, auth_token=turso_auth_token)
+        remote.execute("""
+            CREATE TABLE IF NOT EXISTS memories (
+                id TEXT PRIMARY KEY, content TEXT NOT NULL,
+                type TEXT NOT NULL DEFAULT 'note', tags TEXT NOT NULL DEFAULT '[]',
+                feature_id TEXT, prd_id TEXT, plan_id TEXT, qa_id TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            )
+        """)
+        remote.commit()
+
+        remote_ids = {row[0] for row in remote.execute("SELECT id FROM memories").fetchall()}
+        local_memories = self.list(limit=100_000)
+
+        count = 0
+        for mem in local_memories:
+            if mem.id not in remote_ids:
+                remote.execute(
+                    "INSERT INTO memories VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (mem.id, mem.content, mem.type.value, json.dumps(mem.tags),
+                     mem.feature_id, mem.prd_id, mem.plan_id, mem.qa_id,
+                     mem.created_at.isoformat(), mem.updated_at.isoformat()),
+                )
+                count += 1
+        if count:
+            remote.commit()
+        return count
+
+    def pull_from_turso(self, turso_url: str, turso_auth_token: str) -> int:
+        if libsql is None:
+            raise RuntimeError(
+                "libsql-experimental is required: pip install libsql-experimental"
+            )
+        remote = libsql.connect(database=turso_url, auth_token=turso_auth_token)
+        cursor = remote.execute("SELECT * FROM memories")
+        cols = [d[0] for d in cursor.description]
+        remote_rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+        local_ids = {row[0] for row in self._conn.execute("SELECT id FROM memories").fetchall()}
+
+        count = 0
+        for row in remote_rows:
+            if row["id"] not in local_ids:
+                self._conn.execute(
+                    "INSERT INTO memories VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (row["id"], row["content"], row["type"], row["tags"],
+                     row["feature_id"], row["prd_id"], row["plan_id"], row["qa_id"],
+                     row["created_at"], row["updated_at"]),
+                )
+                if not self._is_turso:
+                    self._conn.execute(
+                        "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
+                        (row["id"], row["content"]),
+                    )
+                vector = self._ollama.embed(row["content"])
+                tags_raw = row["tags"] if isinstance(row["tags"], str) else json.dumps(row["tags"])
+                self._collection.upsert(
+                    ids=[row["id"]],
+                    embeddings=[vector],
+                    documents=[row["content"]],
+                    metadatas=[{
+                        "type": row["type"], "tags": tags_raw,
+                        "feature_id": row["feature_id"] or "",
+                        "prd_id": row["prd_id"] or "",
+                        "plan_id": row["plan_id"] or "",
+                        "qa_id": row["qa_id"] or "",
+                    }],
+                )
+                count += 1
+        if count:
+            self._conn.commit()
+        return count
+
+    def sync_vectors(self) -> int:
+        all_memories = self.list(limit=100_000)
+        existing_ids = set(self._collection.get()["ids"])
+        count = 0
+        for mem in all_memories:
+            if mem.id not in existing_ids:
+                vector = self._ollama.embed(mem.content)
+                self._collection.upsert(
+                    ids=[mem.id],
+                    embeddings=[vector],
+                    documents=[mem.content],
+                    metadatas=[{
+                        "type": mem.type.value,
+                        "tags": json.dumps(mem.tags),
+                        "feature_id": mem.feature_id or "",
+                        "prd_id": mem.prd_id or "",
+                        "plan_id": mem.plan_id or "",
+                        "qa_id": mem.qa_id or "",
+                    }],
+                )
+                count += 1
+        return count
+
+    def _row_to_memory(self, row) -> Memory:
         return Memory(
             id=row["id"],
             content=row["content"],

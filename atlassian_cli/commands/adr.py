@@ -55,6 +55,8 @@ def add(
             db_path=settings.memory_db_path,
             vector_path=settings.memory_vector_path,
             ollama=OllamaClient(settings),
+            turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
+            turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
         )
         memory_id = mem_store.next_id()
         mem = Memory(

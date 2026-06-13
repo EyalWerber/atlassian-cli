@@ -25,6 +25,8 @@ def _get_store() -> MemoryStore:
             db_path=settings.memory_db_path,
             vector_path=settings.memory_vector_path,
             ollama=OllamaClient(settings),
+            turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
+            turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
         )
     except Exception as e:
         console.print(f"[red]✗[/red]  Failed to initialize memory store: {e}")
@@ -221,6 +223,8 @@ def snapshot() -> None:
             db_path=settings.memory_db_path,
             vector_path=settings.memory_vector_path,
             ollama=OllamaClient(settings),
+            turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
+            turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
         )
         decisions = mem_store.list(type=MemoryType.decision, limit=50)
         contexts = mem_store.list(type=MemoryType.context, limit=50)

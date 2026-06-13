@@ -171,3 +171,10 @@ class OllamaClient:
             return response.json()["embedding"]
         except (KeyError, ValueError) as e:
             raise RuntimeError(f"Ollama returned unexpected response format: {e}")
+
+    def ping(self) -> bool:
+        try:
+            response = requests.get(f"{self.host}/api/tags", timeout=3)
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
