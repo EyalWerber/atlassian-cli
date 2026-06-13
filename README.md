@@ -101,16 +101,42 @@ atlassian qa bug QA-001 \
 
 This creates a Jira Bug with a structured description, attaches the artifacts, and links the bug key back to the scenario in the QA plan.
 
+### Memory
+
+```bash
+atlassian memory add "Chose JWT over sessions for stateless mobile auth" \
+  --type decision --tag auth --feature FEAT-001
+
+atlassian memory add "Auth service is temporarily using Redis fallback" \
+  --type context --tag auth
+
+atlassian memory list                        # all memories, newest first
+atlassian memory list --type decision        # filter by type
+atlassian memory list --feature FEAT-001     # filter by feature
+atlassian memory list --tag auth             # filter by tag
+
+atlassian memory search "authentication approach"   # semantic search
+atlassian memory search "auth" --feature FEAT-001   # scoped to feature
+
+atlassian memory show MEM-001               # full record in a panel
+atlassian memory delete MEM-001             # prompts for confirmation
+```
+
+> `list` queries SQLite directly — no Ollama required.  
+> `add` and `search` require Ollama running with `nomic-embed-text` pulled (`ollama pull nomic-embed-text`).
+
 ## Local storage
 
-All plans are stored at `~/.atlassian-cli/`:
+All data is stored at `~/.atlassian-cli/`:
 
 ```
 ~/.atlassian-cli/
 ├── features/    FEAT-001.json ...
 ├── prds/        PRD-001.json  ...
 ├── plans/       PLAN-001.json ...
-└── qa/          QA-001.json   ...
+├── qa/          QA-001.json   ...
+├── memory.db    SQLite — full memory records
+└── vectors/     ChromaDB — semantic search index
 ```
 
 ## How Claude Code uses this
