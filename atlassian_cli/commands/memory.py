@@ -17,11 +17,15 @@ console = Console()
 
 def _get_store() -> MemoryStore:
     settings = get_settings()
-    return MemoryStore(
-        db_path=settings.memory_db_path,
-        vector_path=settings.memory_vector_path,
-        ollama=OllamaClient(settings),
-    )
+    try:
+        return MemoryStore(
+            db_path=settings.memory_db_path,
+            vector_path=settings.memory_vector_path,
+            ollama=OllamaClient(settings),
+        )
+    except Exception as e:
+        console.print(f"[red]✗[/red]  Failed to initialize memory store: {e}")
+        raise typer.Exit(1)
 
 
 @app.command("add")
@@ -92,7 +96,7 @@ def list_memories(
     if not memories:
         console.print("[dim]No memories found.[/dim]")
         return
-    table = Table(show_lines=False)
+    table = Table(title="Memories", show_lines=False)
     table.add_column("ID", style="cyan", no_wrap=True)
     table.add_column("Type")
     table.add_column("Content", max_width=60)
@@ -151,5 +155,9 @@ def delete(id: str = typer.Argument(..., help="e.g. MEM-001")) -> None:
     if not typer.confirm(f"Delete {id}?", default=False):
         console.print("[dim]Cancelled.[/dim]")
         return
-    store.delete(id)
+    try:
+        store.delete(id)
+    except Exception as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
     console.print(f"[green]✓[/green] Memory deleted  [{id}]")
