@@ -51,9 +51,9 @@ def add(
     try:
         store.add(memory)
     except RuntimeError as e:
-        console.print(f"[red]x[/red]  {e}")
+        console.print(f"[red]✗[/red]  {e}")
         raise typer.Exit(1)
-    console.print(f"[green]v[/green] Memory saved  [{memory.id}]")
+    console.print(f"[green]✓[/green] Memory saved  [{memory.id}]")
 
 
 @app.command("show")
@@ -61,7 +61,7 @@ def show(id: str = typer.Argument(..., help="e.g. MEM-001")) -> None:
     store = _get_store()
     memory = store.get(id)
     if not memory:
-        console.print(f"[red]x[/red]  Memory [bold]{id}[/bold] not found")
+        console.print(f"[red]✗[/red]  Memory [bold]{id}[/bold] not found")
         raise typer.Exit(1)
     lines = [
         f"[bold]Content:[/bold]  {memory.content}",
@@ -122,7 +122,7 @@ def search(
     try:
         memories = store.search(query, limit=limit, feature_id=feature)
     except RuntimeError as e:
-        console.print(f"[red]x[/red]  {e}")
+        console.print(f"[red]✗[/red]  {e}")
         raise typer.Exit(1)
     if not memories:
         console.print("[dim]No relevant memories found.[/dim]")
@@ -144,7 +144,7 @@ def delete(id: str = typer.Argument(..., help="e.g. MEM-001")) -> None:
     store = _get_store()
     memory = store.get(id)
     if not memory:
-        console.print(f"[red]x[/red]  Memory [bold]{id}[/bold] not found")
+        console.print(f"[red]✗[/red]  Memory [bold]{id}[/bold] not found")
         raise typer.Exit(1)
     snippet = memory.content[:60] + "..." if len(memory.content) > 60 else memory.content
     console.print(f"[dim]{snippet}[/dim]")
@@ -152,4 +152,4 @@ def delete(id: str = typer.Argument(..., help="e.g. MEM-001")) -> None:
         console.print("[dim]Cancelled.[/dim]")
         return
     store.delete(id)
-    console.print(f"[green]v[/green] Memory deleted  [{id}]")
+    console.print(f"[green]✓[/green] Memory deleted  [{id}]")
