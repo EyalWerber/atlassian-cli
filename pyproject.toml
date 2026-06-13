@@ -17,8 +17,14 @@ dependencies = [
     "chromadb>=0.4",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-mock>=3"]
+
 [project.scripts]
 atlassian = "atlassian_cli.main:app"
+
+[tool.pytest.ini_options]
+addopts = "-p no:logfire"
 
 [tool.setuptools.packages.find]
 where = ["."]

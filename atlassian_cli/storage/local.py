@@ -13,6 +13,7 @@ class LocalStorage:
         (self.base_dir / "prds").mkdir(exist_ok=True)
         (self.base_dir / "plans").mkdir(exist_ok=True)
         (self.base_dir / "qa").mkdir(exist_ok=True)
+        (self.base_dir / "adrs").mkdir(exist_ok=True)
 
     def save(self, model: BaseModel, collection: str) -> None:
         path = self.base_dir / collection / f"{model.id}.json"  # type: ignore[attr-defined]
