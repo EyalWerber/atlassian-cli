@@ -125,6 +125,30 @@ atlassian memory delete MEM-001             # prompts for confirmation
 > `list` queries SQLite directly — no Ollama required.  
 > `add` and `search` require Ollama running with `nomic-embed-text` pulled (`ollama pull nomic-embed-text`).
 
+### ADR (Architecture Decision Records)
+
+```bash
+# Record a decision (auto-saves to memory as type=decision)
+atlassian adr add \
+  --title "Use SQLite for local storage" \
+  --context "Need persistent records without requiring a server" \
+  --decision "Use Python stdlib sqlite3 module" \
+  --consequences "Simple deployment; not suitable for concurrent multi-user access" \
+  --feature FEAT-001
+
+# List all ADRs
+atlassian adr list
+atlassian adr list --feature FEAT-001 --status accepted
+
+# Show full detail
+atlassian adr show ADR-001
+
+# Publish to Confluence
+atlassian adr publish ADR-001
+```
+
+Requires Ollama for memory auto-save (`ollama pull nomic-embed-text`). If Ollama is unavailable, the ADR is still saved locally — memory save is skipped with a warning.
+
 ## Local storage
 
 All data is stored at `~/.atlassian-cli/`:
@@ -135,6 +159,7 @@ All data is stored at `~/.atlassian-cli/`:
 ├── prds/        PRD-001.json  ...
 ├── plans/       PLAN-001.json ...
 ├── qa/          QA-001.json   ...
+├── adrs/        ADR-001.json  ...
 ├── memory.db    SQLite — full memory records
 └── vectors/     ChromaDB — semantic search index
 ```

@@ -360,3 +360,94 @@ class TestADRCommands:
         result = runner.invoke(adr_cmd.app, ["show", "ADR-999"])
         assert result.exit_code == 1
         assert "not found" in result.output
+
+
+# ──────────────────────────────────────────────
+# Task 4: ADR publish
+# ──────────────────────────────────────────────
+
+class TestADRPublish:
+    def test_publish_creates_confluence_page(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+        from atlassian_cli.models.adr import ADR
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        storage = LocalStorage(base_dir=tmp_path)
+        now = datetime.now(timezone.utc)
+        storage.save(ADR(
+            id="ADR-001",
+            title="Use SQLite",
+            context="Need storage",
+            decision="SQLite stdlib",
+            consequences="Simple",
+            created_at=now,
+            updated_at=now,
+        ), "adrs")
+
+        mock_confluence = MagicMock()
+        mock_confluence.create_page.return_value = (
+            "page-123", "https://wiki.example.com/adr-use-sqlite"
+        )
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.ConfluenceClient", lambda s: mock_confluence
+        )
+        mock_settings = MagicMock()
+        monkeypatch.setattr("atlassian_cli.commands.adr.get_settings", lambda: mock_settings)
+
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, ["publish", "ADR-001"])
+
+        assert result.exit_code == 0, result.output
+        assert "https://wiki.example.com/adr-use-sqlite" in result.output
+
+        mock_confluence.create_page.assert_called_once()
+        call_args = mock_confluence.create_page.call_args
+        assert call_args.kwargs["title"] == "ADR: Use SQLite"
+        assert "Status" in call_args.kwargs["body"]
+        assert "Decision" in call_args.kwargs["body"]
+
+        updated = LocalStorage(base_dir=tmp_path).load(ADR, "adrs", "ADR-001")
+        assert updated.confluence_url == "https://wiki.example.com/adr-use-sqlite"
+
+    def test_publish_not_found(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, ["publish", "ADR-999"])
+        assert result.exit_code == 1
+        assert "not found" in result.output
+
+    def test_publish_confluence_error(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import adr as adr_cmd
+        from atlassian_cli.models.adr import ADR
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.LocalStorage",
+            lambda: LocalStorage(base_dir=tmp_path),
+        )
+        storage = LocalStorage(base_dir=tmp_path)
+        now = datetime.now(timezone.utc)
+        storage.save(ADR(
+            id="ADR-001", title="t", context="c", decision="d", consequences="q",
+            created_at=now, updated_at=now,
+        ), "adrs")
+
+        mock_confluence = MagicMock()
+        mock_confluence.create_page.side_effect = RuntimeError("Permission denied. Check your account has access to this Confluence space.")
+        monkeypatch.setattr(
+            "atlassian_cli.commands.adr.ConfluenceClient", lambda s: mock_confluence
+        )
+        mock_settings = MagicMock()
+        monkeypatch.setattr("atlassian_cli.commands.adr.get_settings", lambda: mock_settings)
+
+        runner = CliRunner()
+        result = runner.invoke(adr_cmd.app, ["publish", "ADR-001"])
+        assert result.exit_code == 1
+        assert "Permission denied" in result.output
