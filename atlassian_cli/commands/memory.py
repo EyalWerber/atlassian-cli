@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional
 
 import typer
@@ -10,6 +11,8 @@ from atlassian_cli.config import get_settings
 from atlassian_cli.integrations.ollama import OllamaClient
 from atlassian_cli.models.memory import Memory, MemoryType
 from atlassian_cli.storage.memory_store import MemoryStore
+from atlassian_cli.models.adr import ADR, AdrStatus
+from atlassian_cli.storage.local import LocalStorage
 
 app = typer.Typer(help="Manage project memory")
 console = Console()
@@ -161,3 +164,70 @@ def delete(id: str = typer.Argument(..., help="e.g. MEM-001")) -> None:
         console.print(f"[red]✗[/red]  {e}")
         raise typer.Exit(1)
     console.print(f"[green]✓[/green] Memory deleted  [{id}]")
+
+
+def _build_claude_md(
+    adrs: list[ADR],
+    decisions: list[Memory],
+    contexts: list[Memory],
+    bugs: list[Memory],
+) -> str:
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    parts = [
+        "# Project Context",
+        f"> Generated {now} · Regenerate: `atlassian memory snapshot`",
+        "",
+    ]
+    if adrs:
+        parts.append("## Architecture Decisions (ADRs)")
+        for adr in adrs:
+            parts.append(f"- **{adr.id}** {adr.title} — *{adr.status.value}*")
+        parts.append("")
+    if decisions:
+        parts.append("## Decision Log")
+        for m in decisions:
+            parts.append(f"- [{m.id}] {m.content}")
+        parts.append("")
+    if contexts:
+        parts.append("## Context Notes")
+        for m in contexts:
+            parts.append(f"- [{m.id}] {m.content}")
+        parts.append("")
+    if bugs:
+        parts.append("## Recent Bugs")
+        for m in bugs:
+            parts.append(f"- [{m.id}] {m.content}")
+        parts.append("")
+    return "\n".join(parts)
+
+
+@app.command("snapshot")
+def snapshot() -> None:
+    output = Path("CLAUDE.md")
+    if output.exists():
+        if not typer.confirm("CLAUDE.md already exists. Overwrite?", default=False):
+            console.print("[dim]Cancelled.[/dim]")
+            return
+
+    settings = get_settings()
+    storage = LocalStorage()
+    adrs = storage.list_all(ADR, "adrs")
+
+    decisions: list[Memory] = []
+    contexts: list[Memory] = []
+    bugs: list[Memory] = []
+    try:
+        mem_store = MemoryStore(
+            db_path=settings.memory_db_path,
+            vector_path=settings.memory_vector_path,
+            ollama=OllamaClient(settings),
+        )
+        decisions = mem_store.list(type=MemoryType.decision, limit=50)
+        contexts = mem_store.list(type=MemoryType.context, limit=50)
+        bugs = mem_store.list(type=MemoryType.note, tag="bug", limit=10)
+    except Exception:
+        console.print("[dim]  (memory store unavailable — CLAUDE.md will contain ADRs only)[/dim]")
+
+    content = _build_claude_md(adrs, decisions, contexts, bugs)
+    output.write_text(content, encoding="utf-8")
+    console.print(f"[green]✓[/green] CLAUDE.md written  ({len(content.splitlines())} lines)")
