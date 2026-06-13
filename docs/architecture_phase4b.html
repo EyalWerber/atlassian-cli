@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>body { background: #0d1117; margin: 0; padding: 0; }</style>
+</head>
+<body>
+<svg width="1400" height="960" viewBox="0 0 1400 960" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="ah-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#8b949e"/></marker>
+  <marker id="ah-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#58a6ff"/></marker>
+  <marker id="ah-orange" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"><polygon points="0 0,10 4,0 8" fill="#ffa657"/></marker>
+  <marker id="ah-purple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#bc8cff"/></marker>
+  <marker id="ah-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f85149"/></marker>
+</defs>
+
+<!-- Background -->
+<rect width="1400" height="960" fill="#0d1117"/>
+
+<!-- ── TITLE ── -->
+<text x="700" y="36" text-anchor="middle" fill="#e6edf3" font-size="21" font-weight="bold" font-family="'Segoe UI',sans-serif">atlassian-cli: Feature Intelligence &amp; Bug Memory</text>
+<text x="700" y="58" text-anchor="middle" fill="#6e7681" font-size="12" font-family="'Segoe UI',sans-serif">Every bug is auto-indexed in memory, scoped to its feature — enabling semantic recall across all project history</text>
+
+<!-- ════════ ROW 1: Claude Code ════════ -->
+<rect x="562" y="78" width="236" height="58" rx="10" fill="#1c2128" stroke="#58a6ff" stroke-width="2"/>
+<text x="680" y="103" text-anchor="middle" fill="#58a6ff" font-size="14" font-weight="bold" font-family="'Segoe UI',sans-serif">Claude Code</text>
+<text x="680" y="124" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">orchestrator + context consumer</text>
+
+<!-- ════════ ROW 2: FEAT-001 ════════ -->
+<rect x="540" y="196" width="280" height="58" rx="10" fill="#1c2128" stroke="#3fb950" stroke-width="2.5"/>
+<text x="680" y="221" text-anchor="middle" fill="#3fb950" font-size="15" font-weight="bold" font-family="'Segoe UI',sans-serif">FEAT-001</text>
+<text x="680" y="241" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">Login Feature · Jira Initiative</text>
+
+<!-- ════════ ROW 3: PRD / PLAN / QA ════════ -->
+<rect x="100" y="320" width="196" height="58" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="198" y="345" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">PRD-001</text>
+<text x="198" y="364" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">Requirements Doc</text>
+
+<rect x="544" y="320" width="196" height="58" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="642" y="345" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">PLAN-001</text>
+<text x="642" y="364" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">Implementation Plan</text>
+
+<rect x="964" y="320" width="196" height="58" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="1062" y="345" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">QA-001</text>
+<text x="1062" y="364" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">QA Plan</text>
+
+<!-- ════════ ROW 4: Confluence / Jira / Scenarios ════════ -->
+<rect x="46" y="448" width="214" height="58" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="153" y="473" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">Confluence</text>
+<text x="153" y="492" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">PRD page published</text>
+
+<rect x="476" y="448" width="220" height="58" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="586" y="473" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">Jira</text>
+<text x="586" y="492" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">Epic → Story → Task</text>
+
+<rect x="908" y="448" width="214" height="58" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="1015" y="473" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">Test Scenarios</text>
+<text x="1015" y="492" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">Claude Code + Playwright</text>
+
+<!-- ════════ ROW 5: Bug Found ════════ -->
+<rect x="908" y="573" width="214" height="60" rx="8" fill="#1c2128" stroke="#f85149" stroke-width="2"/>
+<text x="1015" y="599" text-anchor="middle" fill="#f85149" font-size="14" font-weight="bold" font-family="'Segoe UI',sans-serif">Bug Found!</text>
+<text x="1015" y="619" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">screenshot + video captured</text>
+
+<!-- ════════ ROW 6: Jira Bug + Memory Note ════════ -->
+<rect x="722" y="708" width="214" height="60" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="829" y="733" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold" font-family="'Segoe UI',sans-serif">Jira Bug · BUG-123</text>
+<text x="829" y="752" text-anchor="middle" fill="#6e7681" font-size="11" font-family="'Segoe UI',sans-serif">screenshot + video attached</text>
+
+<!-- Memory Note (Phase 4b highlight) -->
+<rect x="1084" y="692" width="268" height="92" rx="10" fill="#1e1400" stroke="#ffa657" stroke-width="2.5"/>
+<!-- Badge -->
+<rect x="1210" y="680" width="114" height="22" rx="5" fill="#ffa657"/>
+<text x="1267" y="695" text-anchor="middle" fill="#0d1117" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">PHASE 4b  ✦ NEW</text>
+<text x="1218" y="718" text-anchor="middle" fill="#ffa657" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">Memory Note</text>
+<text x="1218" y="737" text-anchor="middle" fill="#8b949e" font-size="10" font-family="monospace">type: note  ·  tag: bug</text>
+<text x="1218" y="752" text-anchor="middle" fill="#8b949e" font-size="10" font-family="monospace">feature_id: FEAT-001</text>
+<text x="1218" y="767" text-anchor="middle" fill="#8b949e" font-size="10" font-family="monospace">qa_id: QA-001</text>
+<text x="1218" y="779" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">auto-saved by atlassian qa bug</text>
+
+<!-- ════════ ROW 7: Memory Store ════════ -->
+<rect x="370" y="858" width="546" height="78" rx="10" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+<text x="643" y="883" text-anchor="middle" fill="#bc8cff" font-size="14" font-weight="bold" font-family="'Segoe UI',sans-serif">Memory Store</text>
+<!-- SQLite panel -->
+<rect x="380" y="890" width="254" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="507" y="907" text-anchor="middle" fill="#8b949e" font-size="11" font-family="'Segoe UI',sans-serif">SQLite — full records</text>
+<text x="507" y="921" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">structured queries · no Ollama needed</text>
+<!-- ChromaDB panel -->
+<rect x="644" y="890" width="262" height="36" rx="6" fill="#161b22" stroke="#bc8cff" stroke-width="1"/>
+<text x="775" y="907" text-anchor="middle" fill="#bc8cff" font-size="11" font-family="'Segoe UI',sans-serif">ChromaDB — 768-dim vectors</text>
+<text x="775" y="921" text-anchor="middle" fill="#6e7681" font-size="10" font-family="'Segoe UI',sans-serif">semantic search · scoped by feature_id</text>
+
+<!-- ════════ SEARCH CALLOUT (right of Claude Code) ════════ -->
+<rect x="818" y="74" width="322" height="70" rx="8" fill="#161b22" stroke="#bc8cff" stroke-width="1" stroke-dasharray="5,3"/>
+<text x="832" y="94" fill="#bc8cff" font-size="10" font-family="monospace">$ atlassian memory search "auth bug" \</text>
+<text x="832" y="108" fill="#bc8cff" font-size="10" font-family="monospace">    --feature FEAT-001</text>
+<text x="832" y="124" fill="#3fb950" font-size="10" font-family="monospace">→ MEM-001: "Login 500 on null password..."</text>
+<text x="832" y="136" fill="#3fb950" font-size="10" font-family="monospace">→ MEM-002: "JWT timeout too short..."</text>
+
+<!-- ════════ ARROWS ════════ -->
+
+<!-- Claude Code → FEAT-001 (blue) -->
+<line x1="680" y1="136" x2="680" y2="195" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+
+<!-- FEAT-001 → PRD-001 (gray, left branch) -->
+<path d="M 596 254 C 500 280, 340 300, 247 320" stroke="#8b949e" stroke-width="1.5" fill="none" marker-end="url(#ah-gray)"/>
+<!-- FEAT-001 → PLAN-001 (gray, center) -->
+<line x1="660" y1="254" x2="645" y2="319" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ah-gray)"/>
+<!-- FEAT-001 → QA-001 (gray, right branch) -->
+<path d="M 760 254 C 860 270, 950 300, 1013 320" stroke="#8b949e" stroke-width="1.5" fill="none" marker-end="url(#ah-gray)"/>
+
+<!-- PRD-001 → Confluence (blue dashed) -->
+<path d="M 195 378 L 168 447" stroke="#58a6ff" stroke-width="1.2" stroke-dasharray="5,3" fill="none" marker-end="url(#ah-blue)"/>
+<!-- PLAN-001 → Jira (blue dashed) -->
+<path d="M 628 378 L 600 447" stroke="#58a6ff" stroke-width="1.2" stroke-dasharray="5,3" fill="none" marker-end="url(#ah-blue)"/>
+<!-- QA-001 → Test Scenarios (gray) -->
+<line x1="1050" y1="378" x2="1030" y2="447" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ah-gray)"/>
+
+<!-- Test Scenarios → Bug Found (red) -->
+<line x1="1022" y1="506" x2="1022" y2="572" stroke="#f85149" stroke-width="2" marker-end="url(#ah-red)"/>
+
+<!-- Bug Found → Jira Bug (blue dashed, left) -->
+<path d="M 963 633 C 930 670, 890 694, 879 707" stroke="#58a6ff" stroke-width="1.2" stroke-dasharray="5,3" fill="none" marker-end="url(#ah-blue)"/>
+
+<!-- Bug Found → Memory Note (orange THICK, Phase 4b) -->
+<path d="M 1082 616 C 1110 650, 1140 672, 1168 692" stroke="#ffa657" stroke-width="3.5" fill="none" marker-end="url(#ah-orange)"/>
+<!-- "atlassian qa bug" label on orange arrow -->
+<rect x="1075" y="638" width="102" height="20" rx="4" fill="#1e1400"/>
+<text x="1126" y="652" text-anchor="middle" fill="#ffa657" font-size="10" font-weight="bold" font-family="'Segoe UI',sans-serif">atlassian qa bug</text>
+
+<!-- Memory Note → Memory Store (purple) -->
+<path d="M 1180 784 C 1140 826, 1000 850, 918 862" stroke="#bc8cff" stroke-width="1.5" fill="none" marker-end="url(#ah-purple)"/>
+
+<!-- Memory Store → Claude Code (curved return, purple dashed) -->
+<path d="M 374 895 C 170 895, 120 500, 120 250 C 120 110, 380 107, 561 107" stroke="#bc8cff" stroke-width="1.5" stroke-dasharray="6,3" fill="none" marker-end="url(#ah-purple)"/>
+<!-- Label on return arrow -->
+<rect x="44" y="570" width="134" height="34" rx="4" fill="#161b22" stroke="#bc8cff" stroke-width="1"/>
+<text x="111" y="585" text-anchor="middle" fill="#bc8cff" font-size="10" font-family="monospace">memory search</text>
+<text x="111" y="599" text-anchor="middle" fill="#6e7681" font-size="10" font-family="monospace">--feature FEAT-001</text>
+
+<!-- Callout connector (Memory Store → callout box) -->
+<path d="M 916 868 C 980 868, 1050 140, 818 109" stroke="#bc8cff" stroke-width="1" stroke-dasharray="4,3" fill="none"/>
+
+<!-- ════════ LEGEND ════════ -->
+<rect x="36" y="758" width="316" height="168" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="194" y="782" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="bold" font-family="'Segoe UI',sans-serif">Legend</text>
+
+<rect x="56" y="794" width="16" height="16" rx="3" fill="#1c2128" stroke="#3fb950" stroke-width="2.5"/>
+<text x="82" y="806" fill="#8b949e" font-size="11" font-family="'Segoe UI',sans-serif">Core entity (Feature)</text>
+
+<rect x="56" y="818" width="16" height="16" rx="3" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="82" y="830" fill="#8b949e" font-size="11" font-family="'Segoe UI',sans-serif">CLI artifact (PRD / Plan / QA)</text>
+
+<rect x="56" y="842" width="16" height="16" rx="3" fill="#161b22" stroke="#f85149" stroke-width="2"/>
+<text x="82" y="854" fill="#8b949e" font-size="11" font-family="'Segoe UI',sans-serif">Bug (found during QA)</text>
+
+<rect x="56" y="866" width="16" height="16" rx="3" fill="#161b22" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,2"/>
+<text x="82" y="878" fill="#8b949e" font-size="11" font-family="'Segoe UI',sans-serif">External service (Jira / Confluence)</text>
+
+<rect x="56" y="890" width="16" height="16" rx="3" fill="#1e1400" stroke="#ffa657" stroke-width="2.5"/>
+<text x="82" y="902" fill="#ffa657" font-size="11" font-weight="bold" font-family="'Segoe UI',sans-serif">Phase 4b: Bug → Memory (auto)</text>
+
+<rect x="56" y="914" width="16" height="16" rx="3" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+<text x="82" y="926" fill="#8b949e" font-size="11" font-family="'Segoe UI',sans-serif">Memory system (Phase 4a / 4b)</text>
+
+</svg>
+</body>
+</html>
