@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px;
+  }
+  svg {
+    overflow: visible;
+  }
+
+  /* Node styles */
+  .node-claude { fill: #1a3a5c; stroke: #58a6ff; stroke-width: 2; rx: 12; }
+  .node-cli    { fill: #1a2d1a; stroke: #3fb950; stroke-width: 2.5; }
+  .node-cmd    { fill: #1e1e2e; stroke: #8b949e; stroke-width: 1.5; }
+  .node-cmd-ph4{ fill: #1e1e2e; stroke: #d2a8ff; stroke-width: 1.5; }
+  .node-int    { fill: #1a1e2e; stroke: #79c0ff; stroke-width: 1.5; }
+  .node-ext    { fill: #1e2419; stroke: #56d364; stroke-width: 1.5; }
+  .node-store  { fill: #231a2e; stroke: #d2a8ff; stroke-width: 1.5; }
+  .node-md     { fill: #2a1e10; stroke: #e3b341; stroke-width: 2; }
+
+  /* Text styles */
+  .label-main  { fill: #e6edf3; font-size: 15px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+  .label-sub   { fill: #8b949e; font-size: 10px; font-weight: 400; text-anchor: middle; dominant-baseline: middle; }
+  .label-cmd   { fill: #cdd9e5; font-size: 11px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; }
+  .label-cmd-s { fill: #8b949e; font-size: 9px; text-anchor: middle; dominant-baseline: middle; }
+  .label-ext   { fill: #7ee787; font-size: 12px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; }
+  .label-store { fill: #d2a8ff; font-size: 11px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; }
+  .label-md    { fill: #e3b341; font-size: 13px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+
+  /* Arrows */
+  .arrow-main  { stroke: #3fb950; stroke-width: 2; fill: none; marker-end: url(#arrow-green); }
+  .arrow-int   { stroke: #79c0ff; stroke-width: 1.5; fill: none; marker-end: url(#arrow-blue); stroke-dasharray: 5,3; }
+  .arrow-store { stroke: #d2a8ff; stroke-width: 1.5; fill: none; marker-end: url(#arrow-purple); stroke-dasharray: 5,3; }
+  .arrow-md    { stroke: #e3b341; stroke-width: 2; fill: none; marker-end: url(#arrow-yellow); stroke-dasharray: 8,4; }
+  .arrow-phase4{ stroke: #d2a8ff; stroke-width: 1.5; fill: none; marker-end: url(#arrow-purple); }
+
+  /* Badge */
+  .badge-ph4   { fill: #2d1b6e; stroke: #d2a8ff; stroke-width: 1; rx: 8; }
+  .badge-text  { fill: #d2a8ff; font-size: 9px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+</style>
+</head>
+<body>
+<svg width="1100" height="820" viewBox="0 0 1100 820">
+  <defs>
+    <marker id="arrow-green"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#3fb950"/></marker>
+    <marker id="arrow-blue"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#79c0ff"/></marker>
+    <marker id="arrow-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#d2a8ff"/></marker>
+    <marker id="arrow-yellow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#e3b341"/></marker>
+
+    <!-- Glow filters -->
+    <filter id="glow-green"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-blue"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-yellow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <!-- ══════════ TITLE ══════════ -->
+  <text x="550" y="28" fill="#58a6ff" font-size="18" font-weight="800" text-anchor="middle" font-family="'Segoe UI', sans-serif">atlassian-cli · Architecture</text>
+  <text x="550" y="46" fill="#484f58" font-size="11" text-anchor="middle" font-family="'Segoe UI', sans-serif">Claude Code's Project Operating System</text>
+
+  <!-- ══════════ CLAUDE CODE (top) ══════════ -->
+  <rect x="350" y="60" width="400" height="60" rx="14" class="node-claude" filter="url(#glow-blue)"/>
+  <text x="550" y="84" class="label-main" fill="#58a6ff" font-size="17">☁  Claude Code</text>
+  <text x="550" y="104" class="label-sub">the orchestrator — reads CLAUDE.md, calls CLI, drives Playwright</text>
+
+  <!-- Arrow: Claude Code → CLI -->
+  <line x1="550" y1="120" x2="550" y2="155" class="arrow-main"/>
+
+  <!-- ══════════ atlassian CLI (center hub) ══════════ -->
+  <rect x="320" y="155" width="460" height="55" rx="12" class="node-cli" filter="url(#glow-green)"/>
+  <text x="550" y="176" class="label-main" fill="#3fb950" font-size="16">⚡  atlassian CLI</text>
+  <text x="550" y="196" class="label-sub">AI-native delivery CLI · Python · Typer + Rich + Pydantic v2</text>
+
+  <!-- ══════════ COMMAND GROUPS ══════════ -->
+
+  <!-- feature -->
+  <rect x="30" y="270" width="130" height="105" rx="10" class="node-cmd"/>
+  <text x="95" y="292" class="label-cmd">feature</text>
+  <text x="95" y="311" class="label-cmd-s">create · show · list</text>
+  <line x1="95" y1="320" x2="95" y2="328" stroke="#484f58" stroke-width="1"/>
+  <text x="95" y="340" class="label-cmd-s" fill="#484f58">→ Jira Initiative</text>
+  <text x="95" y="355" class="label-cmd-s" fill="#484f58">local FEAT-001.json</text>
+
+  <!-- prd -->
+  <rect x="185" y="270" width="130" height="105" rx="10" class="node-cmd"/>
+  <text x="250" y="292" class="label-cmd">prd</text>
+  <text x="250" y="311" class="label-cmd-s">create · show · list</text>
+  <text x="250" y="326" class="label-cmd-s">publish</text>
+  <line x1="250" y1="332" x2="250" y2="340" stroke="#484f58" stroke-width="1"/>
+  <text x="250" y="352" class="label-cmd-s" fill="#484f58">→ Confluence page</text>
+  <text x="250" y="367" class="label-cmd-s" fill="#484f58">Ollama generation</text>
+
+  <!-- plan -->
+  <rect x="340" y="270" width="130" height="105" rx="10" class="node-cmd"/>
+  <text x="405" y="292" class="label-cmd">plan</text>
+  <text x="405" y="311" class="label-cmd-s">create · show · list</text>
+  <line x1="405" y1="320" x2="405" y2="328" stroke="#484f58" stroke-width="1"/>
+  <text x="405" y="340" class="label-cmd-s" fill="#484f58">Ollama decompose</text>
+  <text x="405" y="355" class="label-cmd-s" fill="#484f58">→ Epic/Story/Task</text>
+  <text x="405" y="370" class="label-cmd-s" fill="#484f58">PLAN-001.json</text>
+
+  <!-- qa -->
+  <rect x="495" y="270" width="130" height="105" rx="10" class="node-cmd"/>
+  <text x="560" y="292" class="label-cmd">qa</text>
+  <text x="560" y="311" class="label-cmd-s">create · show · list</text>
+  <text x="560" y="326" class="label-cmd-s">bug</text>
+  <line x1="560" y1="332" x2="560" y2="340" stroke="#484f58" stroke-width="1"/>
+  <text x="560" y="352" class="label-cmd-s" fill="#484f58">Ollama scenarios</text>
+  <text x="560" y="367" class="label-cmd-s" fill="#484f58">→ Jira Bug + attach</text>
+
+  <!-- memory (Phase 4) -->
+  <rect x="650" y="270" width="130" height="105" rx="10" class="node-cmd-ph4"/>
+  <rect x="654" y="253" width="62" height="16" rx="8" class="badge-ph4"/>
+  <text x="685" y="261" class="badge-text">Phase 4</text>
+  <text x="715" y="292" class="label-cmd" fill="#d2a8ff">memory</text>
+  <text x="715" y="311" class="label-cmd-s" fill="#a5a5c0">add · search · list</text>
+  <text x="715" y="326" class="label-cmd-s" fill="#a5a5c0">show · delete</text>
+  <line x1="715" y1="332" x2="715" y2="340" stroke="#484f58" stroke-width="1"/>
+  <text x="715" y="352" class="label-cmd-s" fill="#484f58">SQLite + ChromaDB</text>
+  <text x="715" y="367" class="label-cmd-s" fill="#484f58">semantic search</text>
+
+  <!-- adr + claude-md (Phase 4) -->
+  <rect x="805" y="270" width="130" height="105" rx="10" class="node-cmd-ph4"/>
+  <rect x="809" y="253" width="62" height="16" rx="8" class="badge-ph4"/>
+  <text x="840" y="261" class="badge-text">Phase 4</text>
+  <text x="870" y="287" class="label-cmd" fill="#d2a8ff">adr</text>
+  <text x="870" y="305" class="label-cmd-s" fill="#a5a5c0">create · list · show</text>
+  <line x1="870" y1="313" x2="870" y2="320" stroke="#484f58" stroke-width="1"/>
+  <text x="870" y="330" class="label-cmd" fill="#e3b341">claude-md</text>
+  <text x="870" y="348" class="label-cmd-s" fill="#c5a030">generate</text>
+  <text x="870" y="364" class="label-cmd-s" fill="#484f58">→ CLAUDE.md</text>
+
+  <!-- Arrows: CLI → command groups -->
+  <path d="M 430 210 Q 250 240 160 270" class="arrow-main"/>
+  <path d="M 470 210 Q 340 245 310 270" class="arrow-main"/>
+  <path d="M 510 210 L 445 270" class="arrow-main"/>
+  <path d="M 560 210 L 560 270" class="arrow-main"/>
+  <path d="M 610 210 Q 660 240 680 270" class="arrow-main"/>
+  <path d="M 650 210 Q 760 240 840 270" class="arrow-main"/>
+
+  <!-- ══════════ INTEGRATIONS ══════════ -->
+  <rect x="100" y="435" width="140" height="50" rx="10" class="node-int"/>
+  <text x="170" y="455" class="label-cmd" fill="#79c0ff">Jira</text>
+  <text x="170" y="472" class="label-cmd-s" fill="#6a8fa8">atlassian-python-api</text>
+
+  <rect x="270" y="435" width="140" height="50" rx="10" class="node-int"/>
+  <text x="340" y="455" class="label-cmd" fill="#79c0ff">Confluence</text>
+  <text x="340" y="472" class="label-cmd-s" fill="#6a8fa8">atlassian-python-api</text>
+
+  <rect x="440" y="435" width="140" height="50" rx="10" class="node-int"/>
+  <text x="510" y="455" class="label-cmd" fill="#79c0ff">Ollama</text>
+  <text x="510" y="472" class="label-cmd-s" fill="#6a8fa8">HTTP · plan/qa/embed</text>
+
+  <rect x="610" y="435" width="170" height="50" rx="10" class="node-int"/>
+  <text x="695" y="455" class="label-cmd" fill="#d2a8ff">MemoryStore</text>
+  <text x="695" y="472" class="label-cmd-s" fill="#7a6a9a">SQLite + ChromaDB</text>
+
+  <!-- Arrows: commands → integrations -->
+  <path d="M 95 375 Q 95 415 140 435" class="arrow-int"/>
+  <path d="M 250 375 Q 250 415 280 435" class="arrow-int"/>
+  <path d="M 250 375 Q 260 415 320 435" class="arrow-int"/>
+  <path d="M 405 375 Q 405 415 440 435" class="arrow-int"/>
+  <path d="M 405 375 Q 250 410 190 435" class="arrow-int"/>
+  <path d="M 560 375 Q 560 415 480 435" class="arrow-int"/>
+  <path d="M 560 375 Q 300 410 200 435" class="arrow-int"/>
+  <path d="M 715 375 L 695 435" class="arrow-phase4"/>
+  <path d="M 870 375 Q 870 410 750 435" class="arrow-phase4"/>
+
+  <!-- ══════════ EXTERNAL SERVICES ══════════ -->
+  <rect x="100" y="545" width="140" height="55" rx="10" class="node-ext"/>
+  <text x="170" y="566" class="label-ext">Jira Cloud</text>
+  <text x="170" y="583" class="label-cmd-s" fill="#484f58">Issues · Epics · Bugs</text>
+
+  <rect x="270" y="545" width="140" height="55" rx="10" class="node-ext"/>
+  <text x="340" y="566" class="label-ext">Confluence</text>
+  <text x="340" y="583" class="label-cmd-s" fill="#484f58">PRD pages · ADR pages</text>
+
+  <rect x="440" y="545" width="140" height="55" rx="10" class="node-ext"/>
+  <text x="510" y="566" class="label-ext">Ollama (local)</text>
+  <text x="510" y="580" class="label-cmd-s" fill="#484f58">qwen3 · plan decomp</text>
+  <text x="510" y="593" class="label-cmd-s" fill="#484f58">nomic-embed · QA gen</text>
+
+  <!-- Arrows: integrations → external -->
+  <line x1="170" y1="485" x2="170" y2="545" class="arrow-int"/>
+  <line x1="340" y1="485" x2="340" y2="545" class="arrow-int"/>
+  <line x1="510" y1="485" x2="510" y2="545" class="arrow-int"/>
+
+  <!-- ══════════ LOCAL STORAGE ══════════ -->
+  <rect x="620" y="545" width="200" height="130" rx="10" class="node-store"/>
+  <text x="720" y="566" class="label-store">~/.atlassian-cli/</text>
+  <text x="720" y="585" class="label-cmd-s" fill="#9a7abb">features/  FEAT-001.json</text>
+  <text x="720" y="600" class="label-cmd-s" fill="#9a7abb">prds/      PRD-001.json</text>
+  <text x="720" y="615" class="label-cmd-s" fill="#9a7abb">plans/     PLAN-001.json</text>
+  <text x="720" y="630" class="label-cmd-s" fill="#9a7abb">qa/        QA-001.json</text>
+  <text x="720" y="645" class="label-cmd-s" fill="#d2a8ff">memory.db  (SQLite)</text>
+  <text x="720" y="660" class="label-cmd-s" fill="#d2a8ff">vectors/   (ChromaDB)</text>
+
+  <!-- Arrow: MemoryStore → LocalStorage -->
+  <line x1="695" y1="485" x2="695" y2="545" class="arrow-store"/>
+
+  <!-- ══════════ CLAUDE.MD (feedback loop) ══════════ -->
+  <rect x="855" y="545" width="185" height="65" rx="12" class="node-md" filter="url(#glow-yellow)"/>
+  <text x="947" y="568" class="label-md">📋 CLAUDE.md</text>
+  <text x="947" y="587" class="label-cmd-s" fill="#c5a030">auto-generated briefing</text>
+  <text x="947" y="602" class="label-cmd-s" fill="#c5a030">Claude Code reads on start</text>
+
+  <!-- Arrows to CLAUDE.md -->
+  <path d="M 720 660 Q 880 690 947 610" class="arrow-md"/>
+  <path d="M 340 600 Q 600 700 890 590" class="arrow-md"/>
+
+  <!-- The big feedback arrow: CLAUDE.md → Claude Code -->
+  <path d="M 1040 545 Q 1060 300 1060 120 Q 1060 90 780 90"
+        stroke="#e3b341" stroke-width="2.5" fill="none"
+        stroke-dasharray="10,5"
+        marker-end="url(#arrow-yellow)"
+        filter="url(#glow-yellow)"/>
+  <rect x="1055" y="295" width="22" height="120" rx="4" fill="#0d1117" stroke="none"/>
+  <text x="1063" y="315" fill="#e3b341" font-size="10" font-weight="700"
+        transform="rotate(90, 1063, 355)" text-anchor="middle">reads at session start</text>
+
+  <!-- ══════════ LEGEND ══════════ -->
+  <rect x="30" y="720" width="580" height="80" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="50" y="742" fill="#8b949e" font-size="11" font-weight="600">Legend</text>
+
+  <line x1="50" y1="762" x2="90" y2="762" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="98" y="766" fill="#8b949e" font-size="10">CLI calls commands</text>
+
+  <line x1="200" y1="762" x2="240" y2="762" stroke="#79c0ff" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="248" y="766" fill="#8b949e" font-size="10">integration calls</text>
+
+  <line x1="350" y1="762" x2="390" y2="762" stroke="#d2a8ff" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-purple)"/>
+  <text x="398" y="766" fill="#8b949e" font-size="10">Phase 4 (memory)</text>
+
+  <line x1="490" y1="762" x2="530" y2="762" stroke="#e3b341" stroke-width="2" stroke-dasharray="8,4" marker-end="url(#arrow-yellow)"/>
+  <text x="538" y="766" fill="#8b949e" font-size="10">CLAUDE.md feedback loop</text>
+
+  <rect x="52" y="777" width="12" height="12" rx="3" fill="#1a2d1a" stroke="#3fb950" stroke-width="1"/>
+  <text x="70" y="787" fill="#8b949e" font-size="10">Phases 1–3 (live)</text>
+
+  <rect x="200" y="777" width="12" height="12" rx="3" fill="#1e1e2e" stroke="#d2a8ff" stroke-width="1"/>
+  <text x="218" y="787" fill="#8b949e" font-size="10">Phase 4 (designing now)</text>
+</svg>
+</body>
+</html>
