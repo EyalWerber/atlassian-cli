@@ -120,9 +120,12 @@ atlassian memory search "auth" --feature FEAT-001   # scoped to feature
 
 atlassian memory show MEM-001               # full record in a panel
 atlassian memory delete MEM-001             # prompts for confirmation
+
+# Generate CLAUDE.md from memory + ADRs (no Ollama required)
+atlassian memory snapshot
 ```
 
-> `list` queries SQLite directly — no Ollama required.  
+> `list` and `snapshot` query SQLite/LocalStorage directly — no Ollama required.  
 > `add` and `search` require Ollama running with `nomic-embed-text` pulled (`ollama pull nomic-embed-text`).
 
 ### ADR (Architecture Decision Records)
