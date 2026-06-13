@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
     memory_db_path: str = "~/.atlassian-cli/memory.db"
+    memory_vector_path: str = "~/.atlassian-cli/vectors/"
+    ollama_embed_model: str = "nomic-embed-text"
     qa_base_url: str = ""
 
 
