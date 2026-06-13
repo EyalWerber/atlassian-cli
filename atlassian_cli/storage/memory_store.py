@@ -53,6 +53,17 @@ class MemoryStore:
         return f"MEM-{row[0]:03d}"
 
     def add(self, memory: Memory) -> Memory:
+        # Embed first — if Ollama is down, nothing is written anywhere
+        vector = self._ollama.embed(memory.content)
+        metadata = {
+            "type": memory.type.value,
+            "tags": json.dumps(memory.tags),
+            "feature_id": memory.feature_id or "",
+            "prd_id": memory.prd_id or "",
+            "plan_id": memory.plan_id or "",
+            "qa_id": memory.qa_id or "",
+        }
+        # Write to SQLite (not yet committed)
         self._conn.execute(
             """INSERT INTO memories
                (id, content, type, tags, feature_id, prd_id, plan_id, qa_id, created_at, updated_at)
@@ -67,21 +78,15 @@ class MemoryStore:
             "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
             (memory.id, memory.content),
         )
-        self._conn.commit()
-        vector = self._ollama.embed(memory.content)
+        # Upsert to ChromaDB — if this fails, SQLite hasn't committed yet
         self._collection.upsert(
             ids=[memory.id],
             embeddings=[vector],
             documents=[memory.content],
-            metadatas=[{
-                "type": memory.type.value,
-                "tags": json.dumps(memory.tags),
-                "feature_id": memory.feature_id or "",
-                "prd_id": memory.prd_id or "",
-                "plan_id": memory.plan_id or "",
-                "qa_id": memory.qa_id or "",
-            }],
+            metadatas=[metadata],
         )
+        # Only commit SQLite after ChromaDB succeeds
+        self._conn.commit()
         return memory
 
     def get(self, id: str) -> Optional[Memory]:
@@ -106,8 +111,9 @@ class MemoryStore:
             query += " AND feature_id = ?"
             params.append(feature_id)
         if tag is not None:
-            query += " AND tags LIKE ?"
-            params.append(f'%"{tag}"%')
+            escaped = tag.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            query += ' AND tags LIKE ? ESCAPE "\\"'
+            params.append(f'%"{escaped}"%')
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
         return [self._row_to_memory(r) for r in self._conn.execute(query, params).fetchall()]
