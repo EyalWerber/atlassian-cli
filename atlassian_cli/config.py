@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional
 
 from pydantic import ValidationError, SecretStr
@@ -6,10 +7,12 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+_GLOBAL_ENV = Path.home() / ".atlassian-cli" / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=[str(_GLOBAL_ENV), ".env"],  # global fallback, local overrides
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
