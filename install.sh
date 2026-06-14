@@ -24,7 +24,7 @@ fi
 # Turso CLI
 if ! command -v turso > /dev/null 2>&1; then
   echo "==> Installing Turso CLI..."
-  curl -sSfL https://get.tur.so/install.sh | bash
+  npm install -g turso
 else
   echo "==> Turso CLI already installed"
 fi
