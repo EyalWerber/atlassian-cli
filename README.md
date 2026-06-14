@@ -46,6 +46,11 @@ OLLAMA_MODEL=qwen3
 
 # Optional — QA target URL
 QA_BASE_URL=http://localhost:3000
+
+# Optional — Turso shared memory (Phase 5)
+# MEMORY_BACKEND=local        # "local" (default) or "turso"
+# TURSO_URL=libsql://your-db.turso.io
+# TURSO_AUTH_TOKEN=your-turso-token
 ```
 
 Get your API token at: https://id.atlassian.com/manage-profile/security/api-tokens
@@ -177,7 +182,7 @@ All data is stored at `~/.atlassian-cli/`:
 ├── plans/       PLAN-001.json ...
 ├── qa/          QA-001.json   ...
 ├── adrs/        ADR-001.json  ...
-├── memory.db    SQLite — full memory records
+├── memory.db    SQLite — full memory records  (local mode only)
 └── vectors/     ChromaDB — semantic search index
 ```
 
