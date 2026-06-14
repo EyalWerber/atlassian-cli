@@ -27,6 +27,7 @@ def _build_scenarios(scenarios_data: list[dict]) -> list[QAScenario]:
             title=s["title"],
             steps=s["steps"],
             expected_result=s["expected_result"],
+            prd_section=s.get("prd_section"),
         )
         for s in scenarios_data
     ]

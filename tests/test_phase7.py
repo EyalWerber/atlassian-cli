@@ -53,3 +53,40 @@ def test_qa_plan_confluence_fields_default_none():
     )
     assert plan.confluence_page_id is None
     assert plan.confluence_url is None
+
+
+from atlassian_cli.integrations.ollama import _QA_SCENARIO_SCHEMA, _QA_SYSTEM_PROMPT
+from atlassian_cli.commands.qa import _build_scenarios
+
+
+def test_qa_schema_includes_prd_section():
+    assert "prd_section" in _QA_SCENARIO_SCHEMA
+
+
+def test_qa_system_prompt_mentions_prd_section():
+    assert "prd_section" in _QA_SYSTEM_PROMPT
+
+
+def test_build_scenarios_passes_prd_section():
+    raw = [
+        {
+            "title": "Login happy path",
+            "prd_section": "Functional Requirements",
+            "steps": ["Navigate to /login"],
+            "expected_result": "Dashboard shown",
+        }
+    ]
+    scenarios = _build_scenarios(raw)
+    assert scenarios[0].prd_section == "Functional Requirements"
+
+
+def test_build_scenarios_prd_section_optional():
+    raw = [
+        {
+            "title": "No section scenario",
+            "steps": ["Do thing"],
+            "expected_result": "Thing done",
+        }
+    ]
+    scenarios = _build_scenarios(raw)
+    assert scenarios[0].prd_section is None

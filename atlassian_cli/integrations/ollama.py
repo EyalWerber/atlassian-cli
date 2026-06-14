@@ -40,6 +40,7 @@ _QA_SCENARIO_SCHEMA = """{
   "scenarios": [
     {
       "title": "<short scenario name>",
+      "prd_section": "<PRD section this test exercises, one of: Functional Requirements, Non-Functional Requirements, User Stories, Technical Considerations, Risks, Success Metrics>",
       "steps": [
         "<action step, e.g. Navigate to /login>",
         "<action step, e.g. Enter 'test@example.com' in the email field>"
@@ -60,6 +61,7 @@ Rules:
 - Steps must be human-readable browser actions (what to click, navigate, enter)
 - Each step should be one clear action
 - expected_result describes what a passing test looks like
+- prd_section must be the name of the PRD section this test exercises
 - Do not include code, selectors, or technical implementation details in steps"""
 
 
