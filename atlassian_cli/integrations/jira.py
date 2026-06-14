@@ -69,7 +69,7 @@ class JiraClient:
                 "project": {"key": self.project},
                 "summary": summary,
                 "description": _adf_paragraph(description),
-                "issuetype": {"name": "Initiative"},
+                "issuetype": {"name": "Feature"},
             })
             return issue["key"]
         except Exception as e:
@@ -165,5 +165,29 @@ class JiraClient:
     def attach_file(self, issue_key: str, path: str) -> None:
         try:
             self._jira.issue_attach_file(issue_key, path)
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def get_transitions(self, issue_key: str) -> list[dict]:
+        try:
+            result = self._jira.get_issue_transitions(issue_key)
+            return result.get("transitions", [])
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def transition_issue(self, issue_key: str, status_name: str) -> None:
+        transitions = self.get_transitions(issue_key)
+        match = next(
+            (t for t in transitions if t["name"].lower() == status_name.lower()),
+            None,
+        )
+        if match is None:
+            available = [t["name"] for t in transitions]
+            raise RuntimeError(
+                f"Transition '{status_name}' not found for {issue_key}. "
+                f"Available: {available}"
+            )
+        try:
+            self._jira.issue_transition(issue_key, match["id"])
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
