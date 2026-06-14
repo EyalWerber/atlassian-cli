@@ -1,21 +1,24 @@
+from typing import Optional
+
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from atlassian_cli.config import get_settings
 from atlassian_cli.integrations.jira import JiraClient
 
-app = typer.Typer(help="Manage Jira issues")
+app = typer.Typer(help="Manage Jira issue lifecycle")
 console = Console()
 
 
 @app.command("transition")
 def transition(
     key: str = typer.Argument(..., help="Issue key, e.g. SI-42"),
-    status: str = typer.Argument(..., help="Target status, e.g. 'In Progress'"),
+    status: str = typer.Argument(..., help="Target status: 'To Do', 'In Progress', 'In Review', 'Done'"),
 ) -> None:
-    settings = get_settings()
-    jira = JiraClient(settings)
+    """Transition an issue to a new status."""
+    jira = JiraClient(get_settings())
     try:
         jira.transition_issue(key, status)
     except RuntimeError as e:
@@ -28,8 +31,8 @@ def transition(
 def transitions(
     key: str = typer.Argument(..., help="Issue key, e.g. SI-42"),
 ) -> None:
-    settings = get_settings()
-    jira = JiraClient(settings)
+    """List available status transitions for an issue."""
+    jira = JiraClient(get_settings())
     try:
         result = jira.get_transitions(key)
     except RuntimeError as e:
@@ -40,9 +43,123 @@ def transitions(
     table.add_column("Name")
     table.add_column("To Status")
     for t in result:
-        table.add_row(
-            t.get("id", ""),
-            t.get("name", ""),
-            t.get("to", {}).get("name", ""),
-        )
+        table.add_row(t.get("id", ""), t.get("name", ""), t.get("to", {}).get("name", ""))
     console.print(table)
+
+
+@app.command("comment")
+def comment(
+    key: str = typer.Argument(..., help="Issue key, e.g. SI-42"),
+    body: str = typer.Argument(..., help="Comment text"),
+) -> None:
+    """Add a comment to a Jira issue."""
+    jira = JiraClient(get_settings())
+    try:
+        jira.add_comment(key, body)
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+    console.print(f"[green]✓[/green] Comment added to {key}")
+
+
+@app.command("show")
+def show(
+    key: str = typer.Argument(..., help="Issue key, e.g. SI-42"),
+) -> None:
+    """Show details of a Jira issue including links."""
+    jira = JiraClient(get_settings())
+    try:
+        issue = jira.get_issue(key)
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+    fields = issue["fields"]
+    assignee = (fields.get("assignee") or {}).get("displayName", "—")
+    priority = (fields.get("priority") or {}).get("name", "—")
+    links = fields.get("issuelinks", [])
+    link_lines = []
+    for lnk in links:
+        ltype = lnk["type"]["name"]
+        if "outwardIssue" in lnk:
+            other = lnk["outwardIssue"]
+            link_lines.append(f"  {ltype} → {other['key']} {other['fields']['summary']}")
+        if "inwardIssue" in lnk:
+            other = lnk["inwardIssue"]
+            link_lines.append(f"  ← {ltype} {other['key']} {other['fields']['summary']}")
+    links_text = "\n".join(link_lines) if link_lines else "  —"
+    console.print(Panel(
+        f"[bold]Summary:[/bold]   {fields['summary']}\n"
+        f"[bold]Type:[/bold]      {fields['issuetype']['name']}\n"
+        f"[bold]Status:[/bold]    {fields['status']['name']}\n"
+        f"[bold]Priority:[/bold]  {priority}\n"
+        f"[bold]Assignee:[/bold]  {assignee}\n"
+        f"[bold]Links:[/bold]\n{links_text}",
+        title=f"[cyan]{key}[/cyan]",
+    ))
+
+
+@app.command("update")
+def update(
+    key: str = typer.Argument(..., help="Issue key, e.g. SI-5"),
+    description: Optional[str] = typer.Option(None, "--description", help="New description text"),
+) -> None:
+    """Update fields on a Jira issue."""
+    if description is None:
+        console.print("[red]✗[/red]  Nothing to update. Use --description \"...\"")
+        raise typer.Exit(1)
+    jira = JiraClient(get_settings())
+    try:
+        jira.update_description(key, description)
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+    console.print(f"[green]✓[/green] {key} description updated")
+
+
+@app.command("link")
+def link(
+    key: str = typer.Argument(..., help="Source issue key, e.g. SI-11"),
+    blocks: Optional[str] = typer.Option(None, "--blocks", help="Issue key this blocks, e.g. SI-8"),
+) -> None:
+    """Add a link between issues (supports --blocks)."""
+    if not blocks:
+        console.print("[red]✗[/red]  Specify a link type: --blocks KEY")
+        raise typer.Exit(1)
+    jira = JiraClient(get_settings())
+    try:
+        jira.add_link(key, "Blocks", blocks)
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+    console.print(f"[green]✓[/green] {key} blocks {blocks}")
+
+
+@app.command("unlink")
+def unlink(
+    key: str = typer.Argument(..., help="Source issue key, e.g. SI-11"),
+    blocks: Optional[str] = typer.Option(None, "--blocks", help="Issue key to unblock, e.g. SI-8"),
+) -> None:
+    """Remove a link between issues."""
+    if not blocks:
+        console.print("[red]✗[/red]  Specify a link type to remove: --blocks KEY")
+        raise typer.Exit(1)
+    jira = JiraClient(get_settings())
+    try:
+        links = jira.list_links(key)
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+    match = next(
+        (lnk for lnk in links
+         if lnk["type"] == "Blocks" and lnk["outward_key"] == blocks),
+        None,
+    )
+    if not match:
+        console.print(f"[yellow]⚠[/yellow]  No 'Blocks' link from {key} to {blocks} found")
+        raise typer.Exit(1)
+    try:
+        jira.remove_link(match["id"])
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+    console.print(f"[green]✓[/green] Removed: {key} no longer blocks {blocks}")

@@ -152,3 +152,18 @@ def test_update_description_puts_correct_payload():
         "rest/api/2/issue/SI-5",
         data={"fields": {"description": "PRD: https://eyal-werber.atlassian.net/wiki/spaces/SIDEV/pages/123"}},
     )
+
+
+def test_issue_update_description_command():
+    with patch("atlassian_cli.commands.issue.JiraClient") as MockJira, \
+         patch("atlassian_cli.commands.issue.get_settings"):
+        MockJira.return_value.update_description.return_value = None
+        result = runner.invoke(issue_app, [
+            "update", "SI-5",
+            "--description", "PRD: https://confluence.example.com/page/123",
+        ])
+        assert result.exit_code == 0
+        assert "SI-5" in result.output
+        MockJira.return_value.update_description.assert_called_once_with(
+            "SI-5", "PRD: https://confluence.example.com/page/123"
+        )
