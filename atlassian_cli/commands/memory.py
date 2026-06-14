@@ -283,6 +283,12 @@ def status() -> None:
         else:
             console.print(f"[bold]Turso:[/bold]     [dim]not configured  (set TURSO_URL to enable push/pull)[/dim]")
     else:
+        if not settings.turso_url:
+            console.print("[red]✗[/red]  TURSO_URL not configured. Set it in .env when using MEMORY_BACKEND=turso.")
+            raise typer.Exit(1)
+        if libsql is None:
+            console.print("[red]✗[/red]  libsql-experimental not installed. Run: pip install libsql-experimental")
+            raise typer.Exit(1)
         turso_count = 0
         turso_ok = False
         if settings.turso_url and libsql is not None:

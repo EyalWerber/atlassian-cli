@@ -445,7 +445,8 @@ class TestPushCommand:
         result = runner.invoke(mem_cmd.app, ["push"])
 
         assert result.exit_code == 0
-        assert "turso" in result.output.lower() or "already" in result.output.lower()
+        assert "already" in result.output.lower()
+        assert "turso" in result.output.lower()
 
     def test_push_calls_push_to_turso_and_reports_count(self, tmp_path, monkeypatch):
         from atlassian_cli.commands import memory as mem_cmd
