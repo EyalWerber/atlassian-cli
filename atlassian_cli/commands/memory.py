@@ -290,6 +290,14 @@ def status() -> None:
                 url=settings.turso_url,
                 auth_token=settings.turso_auth_token or "",
             )
+            remote.execute("""
+                CREATE TABLE IF NOT EXISTS memories (
+                    id TEXT PRIMARY KEY, content TEXT NOT NULL,
+                    type TEXT NOT NULL DEFAULT 'note', tags TEXT NOT NULL DEFAULT '[]',
+                    feature_id TEXT, prd_id TEXT, plan_id TEXT, qa_id TEXT,
+                    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+                )
+            """)
             row = remote.execute("SELECT COUNT(*) FROM memories").fetchone()
             turso_count = row[0] if row else 0
             turso_ok = True
