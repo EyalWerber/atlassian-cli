@@ -18,16 +18,20 @@ app = typer.Typer(help="Manage project memory")
 console = Console()
 
 
+def _build_mem_store(settings) -> MemoryStore:
+    return MemoryStore(
+        db_path=settings.memory_db_path,
+        vector_path=settings.memory_vector_path,
+        ollama=OllamaClient(settings),
+        turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
+        turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
+    )
+
+
 def _get_store() -> MemoryStore:
     settings = get_settings()
     try:
-        return MemoryStore(
-            db_path=settings.memory_db_path,
-            vector_path=settings.memory_vector_path,
-            ollama=OllamaClient(settings),
-            turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
-            turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
-        )
+        return _build_mem_store(settings)
     except Exception as e:
         console.print(f"[red]✗[/red]  Failed to initialize memory store: {e}")
         raise typer.Exit(1)
@@ -219,13 +223,7 @@ def snapshot() -> None:
     contexts: list[Memory] = []
     bugs: list[Memory] = []
     try:
-        mem_store = MemoryStore(
-            db_path=settings.memory_db_path,
-            vector_path=settings.memory_vector_path,
-            ollama=OllamaClient(settings),
-            turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
-            turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
-        )
+        mem_store = _build_mem_store(settings)
         decisions = mem_store.list(type=MemoryType.decision, limit=50)
         contexts = mem_store.list(type=MemoryType.context, limit=50)
         bugs = mem_store.list(type=MemoryType.note, tag="bug", limit=10)

@@ -139,7 +139,7 @@ class TestBugMemoryAutoLink:
         mock_store = MagicMock()
         mock_store.next_id.return_value = "MEM-001"
         monkeypatch.setattr(
-            "atlassian_cli.commands.qa.MemoryStore", lambda **kwargs: mock_store
+            "atlassian_cli.commands.qa._build_mem_store", lambda settings: mock_store
         )
         mock_settings = MagicMock()
         mock_settings.memory_db_path = "~/.atlassian-cli/memory.db"
@@ -176,9 +176,9 @@ class TestBugMemoryAutoLink:
         mock_jira.create_bug.return_value = "BUG-999"
         monkeypatch.setattr("atlassian_cli.commands.qa.JiraClient", lambda s: mock_jira)
 
-        def failing_store(**kwargs):
+        def failing_store(settings):
             raise RuntimeError("Ollama not available at http://localhost:11434. Is it running?")
-        monkeypatch.setattr("atlassian_cli.commands.qa.MemoryStore", failing_store)
+        monkeypatch.setattr("atlassian_cli.commands.qa._build_mem_store", failing_store)
 
         mock_settings = MagicMock()
         monkeypatch.setattr("atlassian_cli.commands.qa.get_settings", lambda: mock_settings)
@@ -212,7 +212,7 @@ class TestADRCommands:
         mock_store = MagicMock()
         mock_store.next_id.return_value = "MEM-001"
         monkeypatch.setattr(
-            "atlassian_cli.commands.adr.MemoryStore", lambda **kwargs: mock_store
+            "atlassian_cli.commands.adr._build_mem_store", lambda settings: mock_store
         )
         mock_settings = MagicMock()
         monkeypatch.setattr("atlassian_cli.commands.adr.get_settings", lambda: mock_settings)
@@ -252,9 +252,9 @@ class TestADRCommands:
             "atlassian_cli.commands.adr.LocalStorage",
             lambda: LocalStorage(base_dir=tmp_path),
         )
-        def failing_store(**kwargs):
+        def failing_store(settings):
             raise RuntimeError("Ollama not available")
-        monkeypatch.setattr("atlassian_cli.commands.adr.MemoryStore", failing_store)
+        monkeypatch.setattr("atlassian_cli.commands.adr._build_mem_store", failing_store)
         mock_settings = MagicMock()
         monkeypatch.setattr("atlassian_cli.commands.adr.get_settings", lambda: mock_settings)
 

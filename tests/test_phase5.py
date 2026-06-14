@@ -62,10 +62,12 @@ class TestOllamaClientPing:
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        monkeypatch.setattr("atlassian_cli.integrations.ollama.requests.get", lambda *a, **kw: mock_resp)
+        mock_get = MagicMock(return_value=mock_resp)
+        monkeypatch.setattr("atlassian_cli.integrations.ollama.requests.get", mock_get)
 
         client = OllamaClient(mock_settings)
         assert client.ping() is True
+        mock_get.assert_called_once_with("http://localhost:11434/api/tags", timeout=3)
 
     def test_ping_returns_false_when_ollama_down(self, monkeypatch):
         import requests as req

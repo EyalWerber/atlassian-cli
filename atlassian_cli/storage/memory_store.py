@@ -197,6 +197,8 @@ class MemoryStore:
             raise RuntimeError(
                 "libsql-experimental is required: pip install libsql-experimental"
             )
+        if self._is_turso:
+            raise RuntimeError("push_to_turso() requires local mode (MEMORY_BACKEND=local)")
         remote = libsql.connect(database=turso_url, auth_token=turso_auth_token)
         remote.execute("""
             CREATE TABLE IF NOT EXISTS memories (
@@ -230,6 +232,8 @@ class MemoryStore:
             raise RuntimeError(
                 "libsql-experimental is required: pip install libsql-experimental"
             )
+        if self._is_turso:
+            raise RuntimeError("pull_from_turso() requires local mode (MEMORY_BACKEND=local)")
         remote = libsql.connect(database=turso_url, auth_token=turso_auth_token)
         cursor = remote.execute("SELECT * FROM memories")
         cols = [d[0] for d in cursor.description]

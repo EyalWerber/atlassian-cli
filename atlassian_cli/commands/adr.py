@@ -13,6 +13,7 @@ from atlassian_cli.models.adr import ADR, AdrStatus
 from atlassian_cli.models.memory import Memory, MemoryType
 from atlassian_cli.storage.local import LocalStorage
 from atlassian_cli.storage.memory_store import MemoryStore
+from atlassian_cli.commands.memory import _build_mem_store
 
 app = typer.Typer(help="Manage Architecture Decision Records")
 console = Console()
@@ -51,13 +52,7 @@ def add(
 
     memory_id: Optional[str] = None
     try:
-        mem_store = MemoryStore(
-            db_path=settings.memory_db_path,
-            vector_path=settings.memory_vector_path,
-            ollama=OllamaClient(settings),
-            turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
-            turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
-        )
+        mem_store = _build_mem_store(settings)
         memory_id = mem_store.next_id()
         mem = Memory(
             id=memory_id,

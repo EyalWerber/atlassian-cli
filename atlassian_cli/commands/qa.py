@@ -15,6 +15,7 @@ from atlassian_cli.models.qa import QAPlan, QAPlanStatus, QAScenario
 from atlassian_cli.models.memory import Memory, MemoryType
 from atlassian_cli.storage.local import LocalStorage
 from atlassian_cli.storage.memory_store import MemoryStore
+from atlassian_cli.commands.memory import _build_mem_store
 
 app = typer.Typer(help="Generate and manage QA plans")
 console = Console()
@@ -216,13 +217,7 @@ def bug(
 
     # Auto-save memory note (best-effort — bug filing must never fail because Ollama is down)
     try:
-        mem_store = MemoryStore(
-            db_path=settings.memory_db_path,
-            vector_path=settings.memory_vector_path,
-            ollama=OllamaClient(settings),
-            turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
-            turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
-        )
+        mem_store = _build_mem_store(settings)
         now_mem = datetime.now(timezone.utc)
         mem = Memory(
             id=mem_store.next_id(),
