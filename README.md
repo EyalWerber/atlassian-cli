@@ -156,7 +156,7 @@ pip install -e .
 
 **2. Create a Turso database:**
 ```bash
-npm install -g @tursodatabase/cli
+npm install -g turso
 turso auth login
 turso db create atlassian-memory
 turso db show atlassian-memory --url      # copy → TURSO_URL

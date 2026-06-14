@@ -70,6 +70,7 @@ class OllamaClient:
         self.embed_model = settings.ollama_embed_model
 
     def decompose_prd(self, prd: PRD) -> dict:
+        self.warmup()
         user_content = "\n\n".join([
             f"PRD Title: {prd.title}",
             f"Executive Summary: {prd.summary}",
@@ -113,6 +114,7 @@ class OllamaClient:
             raise RuntimeError(f"Ollama returned unexpected response format: {e}")
 
     def generate_qa_scenarios(self, prd: PRD) -> dict:
+        self.warmup()
         user_content = "\n\n".join([
             f"PRD Title: {prd.title}",
             f"Executive Summary: {prd.summary}",
@@ -156,6 +158,7 @@ class OllamaClient:
             raise RuntimeError(f"Ollama returned unexpected response format: {e}")
 
     def embed(self, text: str) -> list[float]:
+        self.warmup()
         try:
             response = requests.post(
                 f"{self.host}/api/embeddings",
@@ -171,6 +174,29 @@ class OllamaClient:
             return response.json()["embedding"]
         except (KeyError, ValueError) as e:
             raise RuntimeError(f"Ollama returned unexpected response format: {e}")
+
+    def _is_warm(self) -> bool:
+        try:
+            resp = requests.get(f"{self.host}/api/ps", timeout=3)
+            models = resp.json().get("models", [])
+            return any(m.get("name", "").startswith(self.model) for m in models)
+        except requests.exceptions.RequestException:
+            return False
+
+    def warmup(self) -> None:
+        """Load the model into VRAM before a heavy request. No-op if already loaded."""
+        if self._is_warm():
+            return
+        try:
+            requests.post(
+                f"{self.host}/api/generate",
+                json={"model": self.model, "prompt": "", "keep_alive": "10m"},
+                timeout=60,
+            )
+        except requests.exceptions.ConnectionError:
+            raise RuntimeError(f"Ollama not available at {self.host}. Is it running?")
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Failed to warm up model {self.model}: {e}")
 
     def ping(self) -> bool:
         try:
