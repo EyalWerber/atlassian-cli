@@ -239,3 +239,10 @@ def test_stp_handles_unpublished_prd():
     )
     assert "Auth PRD" in html
     assert "FunctionalRequirements" not in html
+
+
+def test_section_anchor_handles_hyphenated_names():
+    from atlassian_cli.integrations.confluence import _section_anchor
+    assert _section_anchor("Functional Requirements") == "FunctionalRequirements"
+    assert _section_anchor("Non-Functional Requirements") == "Non-FunctionalRequirements"
+    assert _section_anchor("User Stories") == "UserStories"

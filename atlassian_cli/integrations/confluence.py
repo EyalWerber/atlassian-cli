@@ -38,8 +38,12 @@ def _esc(text: str) -> str:
 def _section_anchor(name: str) -> str:
     """Convert PRD section name to Confluence heading anchor.
     e.g. 'Functional Requirements' -> 'FunctionalRequirements'
+         'Non-Functional Requirements' -> 'Non-FunctionalRequirements'
     """
-    return "".join(word.capitalize() for word in name.split())
+    return "".join(
+        word[0].upper() + word[1:] if word else ""
+        for word in name.split()
+    )
 
 
 def prd_to_storage_format(prd: PRD) -> str:
