@@ -8,6 +8,8 @@ from rich.table import Table
 
 from atlassian_cli.config import get_settings
 from atlassian_cli.integrations.confluence import ConfluenceClient, prd_to_storage_format
+from atlassian_cli.integrations.jira import JiraClient
+from atlassian_cli.models.feature import Feature
 from atlassian_cli.models.prd import PRD, PRDStatus
 from atlassian_cli.storage.local import LocalStorage
 
@@ -26,7 +28,6 @@ def _publish(prd: PRD, storage: LocalStorage) -> PRD:
         updated = prd.model_copy(update={"updated_at": datetime.now(timezone.utc)})
         storage.save(updated, "prds")
         console.print(f"[green]✓[/green] Confluence page updated: {prd.confluence_url}")
-        return updated
     else:
         page_id, url = conf.create_page(title=prd.title, body=body)
         updated = prd.model_copy(update={
@@ -37,7 +38,18 @@ def _publish(prd: PRD, storage: LocalStorage) -> PRD:
         })
         storage.save(updated, "prds")
         console.print(f"[green]✓[/green] Published to Confluence: {url}")
-        return updated
+
+    if updated.feature_id and updated.confluence_url:
+        feature = storage.load(Feature, "features", updated.feature_id)
+        if feature and feature.jira_key:
+            try:
+                jira = JiraClient(settings)
+                jira.add_remote_link(feature.jira_key, updated.confluence_url, updated.title)
+                console.print(f"[green]✓[/green] Linked {feature.jira_key} → Confluence PRD")
+            except RuntimeError as e:
+                console.print(f"[yellow]⚠[/yellow]  Jira remote link failed: {e}")
+
+    return updated
 
 
 @app.command("create")
