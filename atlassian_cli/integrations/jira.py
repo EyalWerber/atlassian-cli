@@ -68,7 +68,7 @@ class JiraClient:
             issue = self._jira.create_issue(fields={
                 "project": {"key": self.project},
                 "summary": summary,
-                "description": _adf_paragraph(description),
+                "description": description,
                 "issuetype": {"name": "Feature"},
             })
             return issue["key"]
@@ -170,7 +170,7 @@ class JiraClient:
 
     def get_transitions(self, issue_key: str) -> list[dict]:
         try:
-            result = self._jira.get_issue_transitions(issue_key)
+            result = self._jira.get(f"rest/api/2/issue/{issue_key}/transitions")
             return result.get("transitions", [])
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
@@ -188,6 +188,53 @@ class JiraClient:
                 f"Available: {available}"
             )
         try:
-            self._jira.issue_transition(issue_key, match["id"])
+            self._jira.post(
+                f"rest/api/2/issue/{issue_key}/transitions",
+                data={"transition": {"id": match["id"]}},
+            )
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def list_links(self, issue_key: str) -> list[dict]:
+        try:
+            fields = self._jira.issue(issue_key, fields="issuelinks")["fields"]
+            links = []
+            for lnk in fields.get("issuelinks", []):
+                inward = lnk.get("inwardIssue", {})
+                outward = lnk.get("outwardIssue", {})
+                links.append({
+                    "id": lnk["id"],
+                    "type": lnk["type"]["name"],
+                    "inward_key": inward.get("key", ""),
+                    "inward_summary": inward.get("fields", {}).get("summary", ""),
+                    "outward_key": outward.get("key", ""),
+                    "outward_summary": outward.get("fields", {}).get("summary", ""),
+                })
+            return links
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def remove_link(self, link_id: str) -> None:
+        try:
+            self._jira.delete(f"rest/api/2/issueLink/{link_id}")
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def add_link(self, inward_key: str, link_type: str, outward_key: str) -> None:
+        try:
+            self._jira.create_issue_link(data={
+                "type": {"name": link_type},
+                "inwardIssue": {"key": inward_key},
+                "outwardIssue": {"key": outward_key},
+            })
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def update_description(self, issue_key: str, description: str) -> None:
+        try:
+            self._jira.put(
+                f"rest/api/2/issue/{issue_key}",
+                data={"fields": {"description": description}},
+            )
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
