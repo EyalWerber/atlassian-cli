@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -13,6 +14,11 @@ from atlassian_cli.models.memory import Memory, MemoryType
 from atlassian_cli.storage.memory_store import MemoryStore
 from atlassian_cli.models.adr import ADR, AdrStatus
 from atlassian_cli.storage.local import LocalStorage
+
+try:
+    import libsql_experimental as libsql
+except ImportError:
+    libsql = None  # type: ignore[assignment]
 
 app = typer.Typer(help="Manage project memory")
 console = Console()
@@ -233,3 +239,106 @@ def snapshot() -> None:
     content = _build_claude_md(adrs, decisions, contexts, bugs)
     output.write_text(content, encoding="utf-8")
     console.print(f"[green]✓[/green] CLAUDE.md written  ({len(content.splitlines())} lines)")
+
+
+@app.command("status")
+def status() -> None:
+    settings = get_settings()
+    backend = settings.memory_backend
+
+    db_path = Path(settings.memory_db_path).expanduser()
+    local_count = 0
+    if db_path.exists():
+        try:
+            conn = sqlite3.connect(str(db_path))
+            row = conn.execute("SELECT COUNT(*) FROM memories").fetchone()
+            local_count = row[0] if row else 0
+            conn.close()
+        except Exception:
+            pass
+
+    vector_count = 0
+    vector_path = Path(settings.memory_vector_path).expanduser()
+    if vector_path.exists():
+        try:
+            import chromadb
+            client = chromadb.PersistentClient(path=str(vector_path))
+            col = client.get_or_create_collection("memories")
+            vector_count = col.count()
+        except Exception:
+            pass
+
+    ollama_ok = OllamaClient(settings).ping()
+    ollama_icon = "[green]✓[/green]" if ollama_ok else "[red]✗[/red]"
+
+    if backend == "local":
+        console.print(f"[bold]Backend:[/bold]   local  [dim](set MEMORY_BACKEND=turso to use Turso)[/dim]")
+        console.print(f"[bold]Store:[/bold]     {settings.memory_db_path}")
+        console.print(f"[bold]Memories:[/bold]  {local_count}")
+        not_embedded = max(0, local_count - vector_count)
+        console.print(f"[bold]Vectors:[/bold]   {vector_count}  [dim]({not_embedded} not yet embedded)[/dim]")
+        console.print(f"[bold]Ollama:[/bold]    {ollama_icon}  {settings.ollama_host}")
+        if settings.turso_url:
+            console.print(f"[bold]Turso:[/bold]     {settings.turso_url}  [dim](push/pull available)[/dim]")
+        else:
+            console.print(f"[bold]Turso:[/bold]     [dim]not configured  (set TURSO_URL to enable push/pull)[/dim]")
+    else:
+        turso_count = 0
+        turso_ok = False
+        if settings.turso_url and libsql is not None:
+            try:
+                remote = libsql.connect(
+                    database=settings.turso_url,
+                    auth_token=settings.turso_auth_token or "",
+                )
+                row = remote.execute("SELECT COUNT(*) FROM memories").fetchone()
+                turso_count = row[0] if row else 0
+                turso_ok = True
+            except Exception:
+                pass
+        turso_icon = "[green]✓[/green]" if turso_ok else "[red]✗[/red]"
+        console.print(f"[bold]Backend:[/bold]   turso")
+        console.print(f"[bold]Remote:[/bold]    {turso_icon}  {settings.turso_url or 'not configured'}")
+        console.print(f"[bold]Memories:[/bold]  {turso_count}  [dim](Turso)[/dim]")
+        console.print(f"[bold]Vectors:[/bold]   {vector_count}  [dim](local ChromaDB)[/dim]")
+        console.print(f"[bold]Ollama:[/bold]    {ollama_icon}  {settings.ollama_host}")
+
+
+@app.command("push")
+def push() -> None:
+    settings = get_settings()
+    if not settings.turso_url:
+        console.print("[red]✗[/red]  TURSO_URL not configured. Set it in .env to enable push.")
+        raise typer.Exit(1)
+    if settings.memory_backend == "turso":
+        console.print("[dim]Backend is already Turso — memories are written directly to Turso.[/dim]")
+        return
+    store = _build_mem_store(settings)
+    try:
+        count = store.push_to_turso(settings.turso_url, settings.turso_auth_token or "")
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+    noun = "memory" if count == 1 else "memories"
+    console.print(f"[green]✓[/green] Pushed {count} new {noun} to Turso")
+
+
+@app.command("pull")
+def pull() -> None:
+    settings = get_settings()
+    if not settings.turso_url:
+        console.print("[red]✗[/red]  TURSO_URL not configured. Set it in .env to enable pull.")
+        raise typer.Exit(1)
+    store = _build_mem_store(settings)
+    try:
+        if settings.memory_backend == "turso":
+            count = store.sync_vectors()
+            noun = "memory" if count == 1 else "memories"
+            console.print(f"[green]✓[/green] Synced {count} new {noun} to local search index")
+        else:
+            count = store.pull_from_turso(settings.turso_url, settings.turso_auth_token or "")
+            noun = "memory" if count == 1 else "memories"
+            console.print(f"[green]✓[/green] Pulled {count} new {noun} from Turso")
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)

@@ -319,3 +319,220 @@ class TestSyncVectors:
 
         count = store.sync_vectors()
         assert count == 0
+
+
+# ──────────────────────────────────────────────
+# Task 2: status / push / pull commands
+# ──────────────────────────────────────────────
+
+class TestStatusCommand:
+    def _setup(self, monkeypatch, tmp_path, backend="local", turso_url=None):
+        mock_settings = MagicMock()
+        mock_settings.memory_backend = backend
+        mock_settings.turso_url = turso_url
+        mock_settings.turso_auth_token = "token" if turso_url else None
+        mock_settings.memory_db_path = str(tmp_path / "mem.db")
+        mock_settings.memory_vector_path = str(tmp_path / "vectors")
+        mock_settings.ollama_host = "http://localhost:11434"
+        monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
+        return mock_settings
+
+    def test_status_local_mode_shows_memory_count(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        self._setup(monkeypatch, tmp_path, backend="local")
+
+        # Create local DB with 2 memories
+        db = sqlite3.connect(str(tmp_path / "mem.db"))
+        db.execute("""CREATE TABLE IF NOT EXISTS memories (
+            id TEXT PRIMARY KEY, content TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'note',
+            tags TEXT NOT NULL DEFAULT '[]', feature_id TEXT, prd_id TEXT, plan_id TEXT,
+            qa_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )""")
+        now_str = datetime.now(timezone.utc).isoformat()
+        db.execute("INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?)",
+                   ("MEM-001", "test", "note", "[]", None, None, None, None, now_str, now_str))
+        db.execute("INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?)",
+                   ("MEM-002", "test2", "note", "[]", None, None, None, None, now_str, now_str))
+        db.commit()
+        db.close()
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.memory.OllamaClient",
+            lambda s: MagicMock(ping=MagicMock(return_value=True)),
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["status"])
+
+        assert result.exit_code == 0, result.output
+        assert "local" in result.output
+        assert "2" in result.output
+
+    def test_status_local_with_turso_url_shows_turso_configured(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        self._setup(monkeypatch, tmp_path, backend="local",
+                    turso_url="libsql://my-db.turso.io")
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.memory.OllamaClient",
+            lambda s: MagicMock(ping=MagicMock(return_value=False)),
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["status"])
+
+        assert result.exit_code == 0, result.output
+        assert "libsql://my-db.turso.io" in result.output
+
+    def test_status_turso_mode_shows_turso_backend(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        self._setup(monkeypatch, tmp_path, backend="turso",
+                    turso_url="libsql://my-db.turso.io")
+
+        mock_remote_cursor = MagicMock()
+        mock_remote_cursor.fetchone.return_value = (5,)
+        mock_remote = MagicMock()
+        mock_remote.execute.return_value = mock_remote_cursor
+        mock_libsql = MagicMock()
+        mock_libsql.connect.return_value = mock_remote
+        monkeypatch.setattr("atlassian_cli.commands.memory.libsql", mock_libsql)
+
+        monkeypatch.setattr(
+            "atlassian_cli.commands.memory.OllamaClient",
+            lambda s: MagicMock(ping=MagicMock(return_value=False)),
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["status"])
+
+        assert result.exit_code == 0, result.output
+        assert "turso" in result.output
+        assert "libsql://my-db.turso.io" in result.output
+
+
+class TestPushCommand:
+    def test_push_requires_turso_url(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        mock_settings = MagicMock()
+        mock_settings.memory_backend = "local"
+        mock_settings.turso_url = None
+        mock_settings.memory_db_path = str(tmp_path / "mem.db")
+        mock_settings.memory_vector_path = str(tmp_path / "vectors")
+        monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["push"])
+
+        assert result.exit_code == 1
+        assert "TURSO_URL" in result.output
+
+    def test_push_noop_in_turso_mode(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        mock_settings = MagicMock()
+        mock_settings.memory_backend = "turso"
+        mock_settings.turso_url = "libsql://db.turso.io"
+        mock_settings.turso_auth_token = "tok"
+        mock_settings.memory_db_path = str(tmp_path / "mem.db")
+        mock_settings.memory_vector_path = str(tmp_path / "vectors")
+        monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["push"])
+
+        assert result.exit_code == 0
+        assert "turso" in result.output.lower() or "already" in result.output.lower()
+
+    def test_push_calls_push_to_turso_and_reports_count(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        mock_settings = MagicMock()
+        mock_settings.memory_backend = "local"
+        mock_settings.turso_url = "libsql://db.turso.io"
+        mock_settings.turso_auth_token = "tok"
+        mock_settings.memory_db_path = str(tmp_path / "mem.db")
+        mock_settings.memory_vector_path = str(tmp_path / "vectors")
+        monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
+
+        mock_store = MagicMock()
+        mock_store.push_to_turso.return_value = 3
+        monkeypatch.setattr(
+            "atlassian_cli.commands.memory._build_mem_store", lambda s: mock_store
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["push"])
+
+        assert result.exit_code == 0, result.output
+        assert "3" in result.output
+        mock_store.push_to_turso.assert_called_once_with("libsql://db.turso.io", "tok")
+
+
+class TestPullCommand:
+    def test_pull_requires_turso_url(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        mock_settings = MagicMock()
+        mock_settings.memory_backend = "local"
+        mock_settings.turso_url = None
+        mock_settings.memory_db_path = str(tmp_path / "mem.db")
+        mock_settings.memory_vector_path = str(tmp_path / "vectors")
+        monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["pull"])
+
+        assert result.exit_code == 1
+        assert "TURSO_URL" in result.output
+
+    def test_pull_local_mode_calls_pull_from_turso(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        mock_settings = MagicMock()
+        mock_settings.memory_backend = "local"
+        mock_settings.turso_url = "libsql://db.turso.io"
+        mock_settings.turso_auth_token = "tok"
+        mock_settings.memory_db_path = str(tmp_path / "mem.db")
+        mock_settings.memory_vector_path = str(tmp_path / "vectors")
+        monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
+
+        mock_store = MagicMock()
+        mock_store.pull_from_turso.return_value = 2
+        monkeypatch.setattr(
+            "atlassian_cli.commands.memory._build_mem_store", lambda s: mock_store
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["pull"])
+
+        assert result.exit_code == 0, result.output
+        assert "2" in result.output
+        mock_store.pull_from_turso.assert_called_once_with("libsql://db.turso.io", "tok")
+
+    def test_pull_turso_mode_calls_sync_vectors(self, tmp_path, monkeypatch):
+        from atlassian_cli.commands import memory as mem_cmd
+
+        mock_settings = MagicMock()
+        mock_settings.memory_backend = "turso"
+        mock_settings.turso_url = "libsql://db.turso.io"
+        mock_settings.turso_auth_token = "tok"
+        mock_settings.memory_db_path = str(tmp_path / "mem.db")
+        mock_settings.memory_vector_path = str(tmp_path / "vectors")
+        monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
+
+        mock_store = MagicMock()
+        mock_store.sync_vectors.return_value = 4
+        monkeypatch.setattr(
+            "atlassian_cli.commands.memory._build_mem_store", lambda s: mock_store
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(mem_cmd.app, ["pull"])
+
+        assert result.exit_code == 0, result.output
+        assert "4" in result.output
+        mock_store.sync_vectors.assert_called_once()
