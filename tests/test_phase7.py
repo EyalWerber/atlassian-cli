@@ -90,3 +90,152 @@ def test_build_scenarios_prd_section_optional():
     ]
     scenarios = _build_scenarios(raw)
     assert scenarios[0].prd_section is None
+
+
+from atlassian_cli.integrations.confluence import stp_to_storage_format
+from atlassian_cli.models.prd import PRD, PRDStatus
+from atlassian_cli.models.feature import Feature, FeatureType, FeatureStatus
+
+
+def _make_plan_for_conf(scenarios=None):
+    now = datetime.now(timezone.utc)
+    return QAPlan(
+        id="QA-001",
+        feature_id="FEAT-001",
+        prd_id="PRD-001",
+        qa_base_url="",
+        scenarios=scenarios or [
+            QAScenario(
+                title="Login happy path",
+                steps=["Navigate to /login", "Enter credentials", "Submit"],
+                expected_result="Redirect to /dashboard",
+                prd_section="Functional Requirements",
+            )
+        ],
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _make_feature_for_conf():
+    now = datetime.now(timezone.utc)
+    return Feature(
+        id="FEAT-001",
+        name="Auth Service",
+        type=FeatureType.new_feature,
+        description="Handle user authentication",
+        jira_key="SI-5",
+        status=FeatureStatus.draft,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _make_prd_for_conf():
+    now = datetime.now(timezone.utc)
+    return PRD(
+        id="PRD-001",
+        title="Auth PRD",
+        summary="Auth system",
+        problem="Users can't log in",
+        personas="End users",
+        stories="As a user I want to log in",
+        business_value="Retention",
+        requirements="Must support email/password login",
+        nfr="Response under 200ms",
+        considerations="",
+        risks="Session hijacking",
+        metrics="99% login success rate",
+        out_of_scope="SSO",
+        future_enhancements="",
+        feature_id="FEAT-001",
+        status=PRDStatus.published,
+        confluence_url="https://example.atlassian.net/wiki/spaces/SI/pages/100",
+        confluence_page_id="100",
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def test_stp_contains_feature_jira_link():
+    html = stp_to_storage_format(
+        _make_plan_for_conf(), _make_feature_for_conf(), _make_prd_for_conf(),
+        atlassian_url="https://example.atlassian.net",
+        jira_project="SI",
+    )
+    assert "SI-5" in html
+    assert "https://example.atlassian.net/browse/SI-5" in html
+
+
+def test_stp_contains_prd_confluence_link():
+    html = stp_to_storage_format(
+        _make_plan_for_conf(), _make_feature_for_conf(), _make_prd_for_conf(),
+        atlassian_url="https://example.atlassian.net",
+        jira_project="SI",
+    )
+    assert "https://example.atlassian.net/wiki/spaces/SI/pages/100" in html
+    assert "Auth PRD" in html
+
+
+def test_stp_contains_section_headings():
+    html = stp_to_storage_format(
+        _make_plan_for_conf(), _make_feature_for_conf(), _make_prd_for_conf(),
+        atlassian_url="https://example.atlassian.net",
+        jira_project="SI",
+    )
+    for heading in ["Introduction", "Test Objectives", "Scope", "Test Strategy",
+                    "Entry", "Test Cases", "Defect Management", "Risks"]:
+        assert heading in html, f"Missing heading: {heading}"
+
+
+def test_stp_test_cases_table_has_prd_section_link():
+    html = stp_to_storage_format(
+        _make_plan_for_conf(), _make_feature_for_conf(), _make_prd_for_conf(),
+        atlassian_url="https://example.atlassian.net",
+        jira_project="SI",
+    )
+    assert "Login happy path" in html
+    assert "FunctionalRequirements" in html
+    assert "https://example.atlassian.net/wiki/spaces/SI/pages/100#FunctionalRequirements" in html
+
+
+def test_stp_test_cases_show_bug_key_when_present():
+    plan = _make_plan_for_conf(scenarios=[
+        QAScenario(
+            title="Fails on bad password",
+            steps=["Navigate", "Enter wrong password", "Submit"],
+            expected_result="Error shown",
+            prd_section="Functional Requirements",
+            bug_key="SI-42",
+        )
+    ])
+    html = stp_to_storage_format(
+        plan, _make_feature_for_conf(), _make_prd_for_conf(),
+        atlassian_url="https://example.atlassian.net",
+        jira_project="SI",
+    )
+    assert "SI-42" in html
+
+
+def test_stp_handles_missing_jira_key():
+    feature = _make_feature_for_conf()
+    feature = feature.model_copy(update={"jira_key": None})
+    html = stp_to_storage_format(
+        _make_plan_for_conf(), feature, _make_prd_for_conf(),
+        atlassian_url="https://example.atlassian.net",
+        jira_project="SI",
+    )
+    assert "Auth Service" in html
+    assert "/browse/None" not in html
+
+
+def test_stp_handles_unpublished_prd():
+    prd = _make_prd_for_conf()
+    prd = prd.model_copy(update={"confluence_url": None, "confluence_page_id": None})
+    html = stp_to_storage_format(
+        _make_plan_for_conf(), _make_feature_for_conf(), prd,
+        atlassian_url="https://example.atlassian.net",
+        jira_project="SI",
+    )
+    assert "Auth PRD" in html
+    assert "FunctionalRequirements" not in html
