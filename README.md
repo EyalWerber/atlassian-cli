@@ -147,6 +147,41 @@ atlassian memory pull
 - `MEMORY_BACKEND=local` (default) — local SQLite, works offline. Use `push`/`pull` to sync with team.
 - `MEMORY_BACKEND=turso` — Turso as primary store. Use `pull` to re-sync local search index.
 
+#### Turso setup
+
+**1. Install build dependencies** (required to compile the Turso SDK on Windows):
+```bash
+winget install Kitware.CMake
+```
+Restart your terminal after installing so `cmake` is on PATH.
+
+**2. Install the Turso extra:**
+```bash
+pip install -e ".[turso]"
+```
+
+**3. Create a Turso database:**
+```bash
+npm install -g @tursodatabase/cli
+turso auth login
+turso db create atlassian-memory
+turso db show atlassian-memory --url      # copy → TURSO_URL
+turso db tokens create atlassian-memory   # copy → TURSO_AUTH_TOKEN
+```
+
+**4. Add to `.env`:**
+```env
+TURSO_URL=libsql://atlassian-memory-<your-org>.turso.io
+TURSO_AUTH_TOKEN=<token>
+MEMORY_BACKEND=local   # or "turso" to use Turso as primary store
+```
+
+**5. Verify and sync:**
+```bash
+atlassian memory status   # shows connectivity
+atlassian memory push     # push local memories → Turso
+```
+
 ### ADR (Architecture Decision Records)
 
 ```bash
