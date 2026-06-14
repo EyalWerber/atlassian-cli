@@ -6,12 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-try:
-    import libsql_experimental as libsql
-except ImportError:
-    libsql = None  # type: ignore[assignment]
-
 from atlassian_cli.integrations.ollama import OllamaClient
+from atlassian_cli.integrations.turso import TursoHttpClient
 from atlassian_cli.models.memory import Memory, MemoryType
 
 
@@ -28,14 +24,9 @@ class MemoryStore:
         self._is_turso = bool(turso_url)
 
         if self._is_turso:
-            if libsql is None:
-                raise RuntimeError(
-                    "libsql-experimental is required for Turso mode. "
-                    "Run: pip install libsql-experimental"
-                )
-            self._conn = libsql.connect(
-                database=turso_url,
-                auth_token=turso_auth_token,
+            self._conn = TursoHttpClient(
+                url=turso_url,
+                auth_token=turso_auth_token or "",
             )
         else:
             self._db_path = Path(db_path).expanduser()
@@ -193,13 +184,9 @@ class MemoryStore:
         return True
 
     def push_to_turso(self, turso_url: str, turso_auth_token: str) -> int:
-        if libsql is None:
-            raise RuntimeError(
-                "libsql-experimental is required: pip install libsql-experimental"
-            )
         if self._is_turso:
             raise RuntimeError("push_to_turso() requires local mode (MEMORY_BACKEND=local)")
-        remote = libsql.connect(database=turso_url, auth_token=turso_auth_token)
+        remote = TursoHttpClient(url=turso_url, auth_token=turso_auth_token)
         remote.execute("""
             CREATE TABLE IF NOT EXISTS memories (
                 id TEXT PRIMARY KEY, content TEXT NOT NULL,
@@ -208,11 +195,8 @@ class MemoryStore:
                 created_at TEXT NOT NULL, updated_at TEXT NOT NULL
             )
         """)
-        remote.commit()
-
         remote_ids = {row[0] for row in remote.execute("SELECT id FROM memories").fetchall()}
         local_memories = self.list(limit=100_000)
-
         count = 0
         for mem in local_memories:
             if mem.id not in remote_ids:
@@ -223,24 +207,16 @@ class MemoryStore:
                      mem.created_at.isoformat(), mem.updated_at.isoformat()),
                 )
                 count += 1
-        if count:
-            remote.commit()
         return count
 
     def pull_from_turso(self, turso_url: str, turso_auth_token: str) -> int:
-        if libsql is None:
-            raise RuntimeError(
-                "libsql-experimental is required: pip install libsql-experimental"
-            )
         if self._is_turso:
             raise RuntimeError("pull_from_turso() requires local mode (MEMORY_BACKEND=local)")
-        remote = libsql.connect(database=turso_url, auth_token=turso_auth_token)
+        remote = TursoHttpClient(url=turso_url, auth_token=turso_auth_token)
         cursor = remote.execute("SELECT * FROM memories")
         cols = [d[0] for d in cursor.description]
         remote_rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
-
         local_ids = {row[0] for row in self._conn.execute("SELECT id FROM memories").fetchall()}
-
         count = 0
         for row in remote_rows:
             if row["id"] not in local_ids:
@@ -250,11 +226,10 @@ class MemoryStore:
                      row["feature_id"], row["prd_id"], row["plan_id"], row["qa_id"],
                      row["created_at"], row["updated_at"]),
                 )
-                if not self._is_turso:
-                    self._conn.execute(
-                        "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
-                        (row["id"], row["content"]),
-                    )
+                self._conn.execute(
+                    "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
+                    (row["id"], row["content"]),
+                )
                 vector = self._ollama.embed(row["content"])
                 tags_raw = row["tags"] if isinstance(row["tags"], str) else json.dumps(row["tags"])
                 self._collection.upsert(

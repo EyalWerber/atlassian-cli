@@ -155,16 +155,15 @@ class TestMemoryStoreLocalMode:
 
 
 class TestMemoryStoreTursoMode:
-    def test_turso_mode_calls_libsql_connect(self, tmp_path, mock_chromadb, monkeypatch):
-        mock_libsql = MagicMock()
+    def test_turso_mode_uses_http_client(self, tmp_path, monkeypatch):
         mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = (1,)
         mock_cursor.fetchall.return_value = []
         mock_cursor.description = [("id",)]
         mock_conn = MagicMock()
         mock_conn.execute.return_value = mock_cursor
-        mock_libsql.connect.return_value = mock_conn
-        monkeypatch.setattr("atlassian_cli.storage.memory_store.libsql", mock_libsql)
+        mock_client_cls = MagicMock(return_value=mock_conn)
+        monkeypatch.setattr("atlassian_cli.storage.memory_store.TursoHttpClient", mock_client_cls)
 
         from atlassian_cli.storage.memory_store import MemoryStore
         mock_ollama = MagicMock()
@@ -175,8 +174,8 @@ class TestMemoryStoreTursoMode:
             turso_url="libsql://my-db.turso.io",
             turso_auth_token="my-token",
         )
-        mock_libsql.connect.assert_called_once_with(
-            database="libsql://my-db.turso.io",
+        mock_client_cls.assert_called_once_with(
+            url="libsql://my-db.turso.io",
             auth_token="my-token",
         )
         assert store._is_turso
@@ -203,11 +202,11 @@ class TestPushToTurso:
         # Remote already has MEM-001
         mock_remote_cursor = MagicMock()
         mock_remote_cursor.fetchall.return_value = [("MEM-001",)]
+        mock_remote_cursor.description = [("id",)]
         mock_remote = MagicMock()
         mock_remote.execute.return_value = mock_remote_cursor
-        mock_libsql = MagicMock()
-        mock_libsql.connect.return_value = mock_remote
-        monkeypatch.setattr("atlassian_cli.storage.memory_store.libsql", mock_libsql)
+        mock_client_cls = MagicMock(return_value=mock_remote)
+        monkeypatch.setattr("atlassian_cli.storage.memory_store.TursoHttpClient", mock_client_cls)
 
         count = store.push_to_turso("libsql://db.turso.io", "token")
 
@@ -232,11 +231,11 @@ class TestPushToTurso:
 
         mock_remote_cursor = MagicMock()
         mock_remote_cursor.fetchall.return_value = [("MEM-001",)]
+        mock_remote_cursor.description = [("id",)]
         mock_remote = MagicMock()
         mock_remote.execute.return_value = mock_remote_cursor
-        mock_libsql = MagicMock()
-        mock_libsql.connect.return_value = mock_remote
-        monkeypatch.setattr("atlassian_cli.storage.memory_store.libsql", mock_libsql)
+        mock_client_cls = MagicMock(return_value=mock_remote)
+        monkeypatch.setattr("atlassian_cli.storage.memory_store.TursoHttpClient", mock_client_cls)
 
         count = store.push_to_turso("libsql://db.turso.io", "token")
         assert count == 0
@@ -268,9 +267,8 @@ class TestPullFromTurso:
         mock_cursor.fetchall.return_value = [remote_row]
         mock_remote = MagicMock()
         mock_remote.execute.return_value = mock_cursor
-        mock_libsql = MagicMock()
-        mock_libsql.connect.return_value = mock_remote
-        monkeypatch.setattr("atlassian_cli.storage.memory_store.libsql", mock_libsql)
+        mock_client_cls = MagicMock(return_value=mock_remote)
+        monkeypatch.setattr("atlassian_cli.storage.memory_store.TursoHttpClient", mock_client_cls)
 
         count = store.pull_from_turso("libsql://db.turso.io", "token")
 
@@ -392,13 +390,12 @@ class TestStatusCommand:
         self._setup(monkeypatch, tmp_path, backend="turso",
                     turso_url="libsql://my-db.turso.io")
 
-        mock_remote_cursor = MagicMock()
-        mock_remote_cursor.fetchone.return_value = (5,)
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (5,)
         mock_remote = MagicMock()
-        mock_remote.execute.return_value = mock_remote_cursor
-        mock_libsql = MagicMock()
-        mock_libsql.connect.return_value = mock_remote
-        monkeypatch.setattr("atlassian_cli.commands.memory.libsql", mock_libsql)
+        mock_remote.execute.return_value = mock_cursor
+        mock_client_cls = MagicMock(return_value=mock_remote)
+        monkeypatch.setattr("atlassian_cli.commands.memory.TursoHttpClient", mock_client_cls)
 
         monkeypatch.setattr(
             "atlassian_cli.commands.memory.OllamaClient",

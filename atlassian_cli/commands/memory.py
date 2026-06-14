@@ -15,10 +15,7 @@ from atlassian_cli.storage.memory_store import MemoryStore
 from atlassian_cli.models.adr import ADR, AdrStatus
 from atlassian_cli.storage.local import LocalStorage
 
-try:
-    import libsql_experimental as libsql
-except ImportError:
-    libsql = None  # type: ignore[assignment]
+from atlassian_cli.integrations.turso import TursoHttpClient
 
 app = typer.Typer(help="Manage project memory")
 console = Console()
@@ -286,22 +283,18 @@ def status() -> None:
         if not settings.turso_url:
             console.print("[red]✗[/red]  TURSO_URL not configured. Set it in .env when using MEMORY_BACKEND=turso.")
             raise typer.Exit(1)
-        if libsql is None:
-            console.print("[red]✗[/red]  libsql-experimental not installed. Run: pip install libsql-experimental")
-            raise typer.Exit(1)
         turso_count = 0
         turso_ok = False
-        if settings.turso_url and libsql is not None:
-            try:
-                remote = libsql.connect(
-                    database=settings.turso_url,
-                    auth_token=settings.turso_auth_token or "",
-                )
-                row = remote.execute("SELECT COUNT(*) FROM memories").fetchone()
-                turso_count = row[0] if row else 0
-                turso_ok = True
-            except Exception:
-                pass
+        try:
+            remote = TursoHttpClient(
+                url=settings.turso_url,
+                auth_token=settings.turso_auth_token or "",
+            )
+            row = remote.execute("SELECT COUNT(*) FROM memories").fetchone()
+            turso_count = row[0] if row else 0
+            turso_ok = True
+        except Exception:
+            pass
         turso_icon = "[green]✓[/green]" if turso_ok else "[red]✗[/red]"
         console.print(f"[bold]Backend:[/bold]   turso")
         console.print(f"[bold]Remote:[/bold]    {turso_icon}  {settings.turso_url or 'not configured'}")

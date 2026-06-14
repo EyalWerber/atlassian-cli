@@ -19,7 +19,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-mock>=3"]
-turso = ["libsql-experimental>=0.0.9"]
 
 [project.scripts]
 atlassian = "atlassian_cli.main:app"

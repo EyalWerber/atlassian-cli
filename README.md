@@ -149,18 +149,12 @@ atlassian memory pull
 
 #### Turso setup
 
-**1. Install build dependencies** (required to compile the Turso SDK on Windows):
+**1. Install the CLI** (Turso support is built-in — no extra build tools needed):
 ```bash
-winget install Kitware.CMake
-```
-Restart your terminal after installing so `cmake` is on PATH.
-
-**2. Install the Turso extra:**
-```bash
-pip install -e ".[turso]"
+pip install -e .
 ```
 
-**3. Create a Turso database:**
+**2. Create a Turso database:**
 ```bash
 npm install -g @tursodatabase/cli
 turso auth login
@@ -169,14 +163,14 @@ turso db show atlassian-memory --url      # copy → TURSO_URL
 turso db tokens create atlassian-memory   # copy → TURSO_AUTH_TOKEN
 ```
 
-**4. Add to `.env`:**
+**3. Add to `.env`:**
 ```env
 TURSO_URL=libsql://atlassian-memory-<your-org>.turso.io
 TURSO_AUTH_TOKEN=<token>
 MEMORY_BACKEND=local   # or "turso" to use Turso as primary store
 ```
 
-**5. Verify and sync:**
+**4. Verify and sync:**
 ```bash
 atlassian memory status   # shows connectivity
 atlassian memory push     # push local memories → Turso

@@ -3,24 +3,6 @@ set -e
 
 echo "==> Installing atlassian-cli with Turso support"
 
-# cmake (required to build libsql-experimental)
-if ! command -v cmake > /dev/null 2>&1; then
-  echo "==> Installing cmake..."
-  if command -v brew > /dev/null 2>&1; then
-    brew install cmake
-  elif command -v apt-get > /dev/null 2>&1; then
-    sudo apt-get update && sudo apt-get install -y cmake
-  elif command -v dnf > /dev/null 2>&1; then
-    sudo dnf install -y cmake
-  else
-    echo "ERROR: cmake not found and no known package manager available."
-    echo "Install cmake manually: https://cmake.org/download/"
-    exit 1
-  fi
-else
-  echo "==> cmake already installed"
-fi
-
 # Turso CLI
 if ! command -v turso > /dev/null 2>&1; then
   echo "==> Installing Turso CLI..."
@@ -29,9 +11,9 @@ else
   echo "==> Turso CLI already installed"
 fi
 
-# Python package with turso extra
-echo "==> Installing atlassian-cli + turso extra..."
-pip install -e ".[turso]"
+# Python package
+echo "==> Installing atlassian-cli..."
+pip install -e .
 
 echo ""
 echo "Done! Next steps:"
