@@ -123,10 +123,24 @@ atlassian memory delete MEM-001             # prompts for confirmation
 
 # Generate CLAUDE.md from memory + ADRs (no Ollama required)
 atlassian memory snapshot
+
+# Show backend status, memory counts, and connectivity
+atlassian memory status
+
+# Sync local memories → Turso (requires TURSO_URL in .env)
+atlassian memory push
+
+# Sync Turso → local + re-embed (requires TURSO_URL + Ollama)
+atlassian memory pull
 ```
 
-> `list` and `snapshot` query SQLite/LocalStorage directly — no Ollama required.  
-> `add` and `search` require Ollama running with `nomic-embed-text` pulled (`ollama pull nomic-embed-text`).
+> `list`, `snapshot`, and `status` query SQLite/LocalStorage directly — no Ollama required.  
+> `add` and `search` require Ollama running with `nomic-embed-text` pulled (`ollama pull nomic-embed-text`).  
+> `pull` also requires Ollama to re-embed memories fetched from Turso.
+
+**Backends:**
+- `MEMORY_BACKEND=local` (default) — local SQLite, works offline. Use `push`/`pull` to sync with team.
+- `MEMORY_BACKEND=turso` — Turso as primary store. Use `pull` to re-sync local search index.
 
 ### ADR (Architecture Decision Records)
 
