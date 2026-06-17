@@ -84,6 +84,31 @@ atlassian plan list
 
 `--save` persists the plan to `~/.atlassian-cli/plans/`. Without it, the plan is only shown and optionally pushed to Jira.
 
+### Issues
+
+```bash
+# Show issue details and links
+atlassian issue show SI-42
+
+# Transition status (available: To Do, In Progress, In Review, Done)
+atlassian issue transition SI-42 "In Progress"
+
+# List available transitions
+atlassian issue transitions SI-42
+
+# Add a comment
+atlassian issue comment SI-42 "Fixed by refactoring the auth middleware."
+
+# Add a blocking link (SI-11 blocks SI-8)
+atlassian issue link SI-11 --blocks SI-8
+
+# Remove a blocking link
+atlassian issue unlink SI-11 --blocks SI-8
+
+# Update issue description (e.g. write Confluence PRD URL back into Jira)
+atlassian issue update SI-12 --description "PRD: https://confluence.example.com/wiki/spaces/X/pages/123"
+```
+
 ### QA
 
 ```bash
