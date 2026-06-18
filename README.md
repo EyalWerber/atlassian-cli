@@ -117,6 +117,20 @@ atlassian qa show QA-001
 atlassian qa list
 ```
 
+```bash
+# Publish a Software Test Plan to Confluence
+# Requires the QA plan to have a linked PRD published to Confluence
+atlassian qa stp QA-001
+```
+
+This creates (or updates) a Confluence STP page containing:
+- Header panel with links to the Jira feature ticket and PRD
+- Introduction, objectives, scope, test strategy, entry/exit criteria
+- Test cases table — each row links to the PRD section it exercises
+- Defect management guidance and risks
+
+The STP page URL is saved to the QA plan locally and linked back to the Jira feature issue as a remote link.
+
 After Claude Code runs a scenario through Playwright and finds a bug:
 
 ```bash
