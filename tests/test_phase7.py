@@ -419,3 +419,39 @@ def test_qa_stp_links_jira_after_publish():
             "https://example.atlassian.net/wiki/spaces/SI/pages/999",
             "STP: Auth",
         )
+
+
+def test_qa_stp_update_path_also_links_jira():
+    _, feature, prd = _make_models()
+    from atlassian_cli.models.qa import QAPlan
+    from atlassian_cli.models.feature import Feature
+    from atlassian_cli.models.prd import PRD
+    now = datetime.now(timezone.utc)
+    plan_with_page = QAPlan(
+        id="QA-001", feature_id="FEAT-001", prd_id="PRD-001",
+        qa_base_url="", scenarios=[], created_at=now, updated_at=now,
+        confluence_page_id="999",
+        confluence_url="https://example.atlassian.net/wiki/spaces/SI/pages/999",
+    )
+
+    with patch("atlassian_cli.commands.qa.get_settings", return_value=_mock_settings()), \
+         patch("atlassian_cli.commands.qa.LocalStorage") as MockStorage, \
+         patch("atlassian_cli.commands.qa.ConfluenceClient"), \
+         patch("atlassian_cli.commands.qa.JiraClient") as MockJira:
+
+        mock_storage = MagicMock()
+        MockStorage.return_value = mock_storage
+        mock_storage.load.side_effect = lambda model, folder, id: {
+            (QAPlan, "qa", "QA-001"): plan_with_page,
+            (Feature, "features", "FEAT-001"): feature,
+            (PRD, "prds", "PRD-001"): prd,
+        }.get((model, folder, id))
+
+        result = _runner.invoke(qa_app, ["stp", "QA-001"])
+
+        assert result.exit_code == 0, result.output
+        MockJira.return_value.add_remote_link.assert_called_once_with(
+            "SI-5",
+            "https://example.atlassian.net/wiki/spaces/SI/pages/999",
+            "STP: Auth",
+        )

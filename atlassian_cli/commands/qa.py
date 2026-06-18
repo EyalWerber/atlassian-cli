@@ -273,7 +273,7 @@ def stp(
                 conf.update_page(page_id=plan.confluence_page_id, title=title, body=body)
                 updated = plan.model_copy(update={"updated_at": datetime.now(timezone.utc)})
                 storage.save(updated, "qa")
-                console.print(f"[green]✓[/green] STP updated: {plan.confluence_url}")
+                console.print(f"[green]✓[/green] STP updated: {updated.confluence_url}")
             else:
                 page_id, url = conf.create_page(title=title, body=body)
                 updated = plan.model_copy(update={
