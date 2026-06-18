@@ -7,6 +7,7 @@ from rich.table import Table
 from rich.tree import Tree
 
 from atlassian_cli.config import get_settings
+from atlassian_cli.integrations.confluence import ConfluenceClient, stp_to_storage_format
 from atlassian_cli.integrations.jira import JiraClient
 from atlassian_cli.integrations.ollama import OllamaClient
 from atlassian_cli.models.feature import Feature
@@ -237,3 +238,59 @@ def bug(
         console.print(f"[green]✓[/green] Memory auto-saved  [{mem.id}]")
     except Exception:
         console.print("[dim]  (memory auto-save skipped — Ollama not available)[/dim]")
+
+
+@app.command("stp")
+def stp(
+    qa_id: str = typer.Argument(..., help="QA Plan ID (e.g. QA-001)"),
+) -> None:
+    """Publish a Software Test Plan to Confluence."""
+    storage = LocalStorage()
+
+    plan = storage.load(QAPlan, "qa", qa_id)
+    if not plan:
+        console.print(f"[red]✗[/red]  QA Plan [bold]{qa_id}[/bold] not found")
+        raise typer.Exit(1)
+
+    feature = storage.load(Feature, "features", plan.feature_id)
+    if not feature:
+        console.print(f"[red]✗[/red]  Feature [bold]{plan.feature_id}[/bold] not found")
+        raise typer.Exit(1)
+
+    prd = storage.load(PRD, "prds", plan.prd_id)
+    if not prd:
+        console.print(f"[red]✗[/red]  PRD [bold]{plan.prd_id}[/bold] not found")
+        raise typer.Exit(1)
+
+    settings = get_settings()
+    conf = ConfluenceClient(settings)
+    body = stp_to_storage_format(plan, feature, prd, settings.atlassian_url, settings.jira_project)
+    title = f"STP: {feature.name}"
+
+    with console.status("[bold green]Publishing STP to Confluence...[/bold green]"):
+        try:
+            if plan.confluence_page_id:
+                conf.update_page(page_id=plan.confluence_page_id, title=title, body=body)
+                updated = plan.model_copy(update={"updated_at": datetime.now(timezone.utc)})
+                storage.save(updated, "qa")
+                console.print(f"[green]✓[/green] STP updated: {plan.confluence_url}")
+            else:
+                page_id, url = conf.create_page(title=title, body=body)
+                updated = plan.model_copy(update={
+                    "confluence_page_id": page_id,
+                    "confluence_url": url,
+                    "updated_at": datetime.now(timezone.utc),
+                })
+                storage.save(updated, "qa")
+                console.print(f"[green]✓[/green] STP published: {url}")
+        except RuntimeError as e:
+            console.print(f"[red]✗[/red]  {e}")
+            raise typer.Exit(1)
+
+    if feature.jira_key and updated.confluence_url:
+        try:
+            jira = JiraClient(settings)
+            jira.add_remote_link(feature.jira_key, updated.confluence_url, title)
+            console.print(f"[green]✓[/green] Linked {feature.jira_key} → STP")
+        except RuntimeError as e:
+            console.print(f"[yellow]⚠[/yellow]  Jira remote link failed: {e}")
