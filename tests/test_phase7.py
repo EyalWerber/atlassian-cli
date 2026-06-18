@@ -195,8 +195,8 @@ def test_stp_test_cases_table_has_prd_section_link():
         jira_project="SI",
     )
     assert "Login happy path" in html
-    assert "FunctionalRequirements" in html
-    assert "https://example.atlassian.net/wiki/spaces/SI/pages/100#FunctionalRequirements" in html
+    assert "Functional-Requirements" in html
+    assert "https://example.atlassian.net/wiki/spaces/SI/pages/100#Functional-Requirements" in html
 
 
 def test_stp_test_cases_show_bug_key_when_present():
@@ -243,9 +243,9 @@ def test_stp_handles_unpublished_prd():
 
 def test_section_anchor_handles_hyphenated_names():
     from atlassian_cli.integrations.confluence import _section_anchor
-    assert _section_anchor("Functional Requirements") == "FunctionalRequirements"
-    assert _section_anchor("Non-Functional Requirements") == "Non-FunctionalRequirements"
-    assert _section_anchor("User Stories") == "UserStories"
+    assert _section_anchor("Functional Requirements") == "Functional-Requirements"
+    assert _section_anchor("Non-Functional Requirements") == "Non-Functional-Requirements"
+    assert _section_anchor("User Stories") == "User-Stories"
 
 
 from unittest.mock import MagicMock, patch

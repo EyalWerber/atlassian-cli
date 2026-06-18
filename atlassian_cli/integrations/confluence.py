@@ -37,10 +37,10 @@ def _esc(text: str) -> str:
 
 def _section_anchor(name: str) -> str:
     """Convert PRD section name to Confluence heading anchor.
-    e.g. 'Functional Requirements' -> 'FunctionalRequirements'
-         'Non-Functional Requirements' -> 'Non-FunctionalRequirements'
+    e.g. 'Functional Requirements' -> 'Functional-Requirements'
+         'Non-Functional Requirements' -> 'Non-Functional-Requirements'
     """
-    return "".join(
+    return "-".join(
         word[0].upper() + word[1:] if word else ""
         for word in name.split()
     )
@@ -100,7 +100,7 @@ def stp_to_storage_format(
         f'    <p><strong>Feature:</strong> {feature_link}</p>',
         f'    <p><strong>PRD:</strong> {prd_link}</p>',
         f'    <p><strong>Date:</strong> {date}</p>',
-        '    <p><strong>Status:</strong> Draft</p>',
+        f'    <p><strong>Status:</strong> {plan.status.value.title()}</p>',
         '  </ac:rich-text-body>',
         '</ac:structured-macro>',
         '',
@@ -161,7 +161,7 @@ def stp_to_storage_format(
         else:
             prd_section_html = _esc(scenario.prd_section) if scenario.prd_section else "—"
 
-        bug_html = scenario.bug_key or "—"
+        bug_html = _esc(scenario.bug_key) if scenario.bug_key else "—"
         parts.append(
             f'    <tr>'
             f'<td>{i}</td>'
