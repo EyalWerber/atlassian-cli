@@ -65,10 +65,7 @@ class MemoryStore:
             self._conn.commit()
 
     def _init_chroma(self) -> None:
-        import chromadb
-        self._vector_path.mkdir(parents=True, exist_ok=True)
-        client = chromadb.PersistentClient(path=str(self._vector_path))
-        self._collection = client.get_or_create_collection("memories")
+        self._collection = None
 
     def _rows(self, query: str, params: tuple = ()) -> list:
         cursor = self._conn.execute(query, params)
@@ -116,12 +113,13 @@ class MemoryStore:
                 "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
                 (memory.id, memory.content),
             )
-        self._collection.upsert(
-            ids=[memory.id],
-            embeddings=[vector],
-            documents=[memory.content],
-            metadatas=[metadata],
-        )
+        if self._collection is not None:
+            self._collection.upsert(
+                ids=[memory.id],
+                embeddings=[vector],
+                documents=[memory.content],
+                metadatas=[metadata],
+            )
         self._conn.commit()
         return memory
 
@@ -145,30 +143,38 @@ class MemoryStore:
             query += " AND feature_id = ?"
             params.append(feature_id)
         if tag is not None:
-            escaped = tag.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            query += ' AND tags LIKE ? ESCAPE "\\"'
-            params.append(f'%"{escaped}"%')
+            query += " AND tags LIKE ?"
+            params.append(f'%"{tag}"%')
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
         return [self._row_to_memory(r) for r in self._rows(query, tuple(params))]
 
     def search(self, query: str, limit: int = 5, feature_id: Optional[str] = None) -> list[Memory]:
-        vector = self._ollama.embed(query)
-        total = self._collection.count()
-        if total == 0:
-            return []
-        n = min(limit, total)
-        where = {"feature_id": {"$eq": feature_id}} if feature_id else None
-        try:
-            results = self._collection.query(
-                query_embeddings=[vector],
-                n_results=n,
-                where=where,
+        if self._collection is not None:
+            vector = self._ollama.embed(query)
+            total = self._collection.count()
+            if total == 0:
+                return []
+            n = min(limit, total)
+            where = {"feature_id": {"$eq": feature_id}} if feature_id else None
+            try:
+                results = self._collection.query(
+                    query_embeddings=[vector],
+                    n_results=n,
+                    where=where,
+                )
+                ids = results["ids"][0]
+                return [m for id in ids if (m := self.get(id)) is not None]
+            except Exception:
+                pass
+        # FTS fallback (SQLite local only)
+        if not self._is_turso:
+            rows = self._rows(
+                "SELECT m.* FROM memories m JOIN memories_fts f ON m.id = f.id WHERE memories_fts MATCH ? LIMIT ?",
+                (query, limit),
             )
-        except Exception:
-            return []
-        ids = results["ids"][0]
-        return [m for id in ids if (m := self.get(id)) is not None]
+            return [self._row_to_memory(r) for r in rows]
+        return self.list(limit=limit, feature_id=feature_id)
 
     def delete(self, id: str) -> bool:
         if not self._conn.execute("SELECT id FROM memories WHERE id = ?", (id,)).fetchone():
