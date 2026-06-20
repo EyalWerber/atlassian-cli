@@ -7,7 +7,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from atlassian_cli.commands import feature, prd, plan, qa, memory, adr, issue
+from atlassian_cli.commands import feature, prd, plan, qa, memory, adr, issue, project
 
 app = typer.Typer(
     name="atlassian",
@@ -23,6 +23,7 @@ app.add_typer(qa.app, name="qa")
 app.add_typer(memory.app, name="memory")
 app.add_typer(adr.app, name="adr")
 app.add_typer(issue.app, name="issue")
+app.add_typer(project.app, name="project")
 
 if __name__ == "__main__":
     app()

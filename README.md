@@ -57,6 +57,24 @@ Get your API token at: https://id.atlassian.com/manage-profile/security/api-toke
 
 ## Usage
 
+### `atlassian project init`
+
+Interactive setup wizard. Run once per project to create a local `.env` file.
+
+```sh
+cd my-project/
+atlassian project init
+```
+
+The wizard will:
+1. Ask for your Atlassian URL, email, and API token
+2. Connect to an existing Jira project or create a new one
+3. Connect to an existing Confluence space or create a new one
+4. List installed Ollama models — pick one or pull a new model on the spot
+5. Ask for a memory backend: local SQLite (default) or Turso
+   - If Turso is chosen and the `turso` CLI is present, it can create the database automatically
+6. Write `.env` in the current directory and verify all connections
+
 ### Features
 
 ```bash
