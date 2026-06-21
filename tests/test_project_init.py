@@ -117,7 +117,7 @@ def _base_patches():
 def test_init_existing_project_local_backend_writes_env(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     # Input sequence (one entry per typer.prompt / typer.confirm call):
-    # URL, email, token, jira-choice(e), proj-key,
+    # URL, email, token, confirm-token, jira-choice(e), proj-key,
     # conf-choice(e), space-key,
     # ollama-host, model-name (no models installed), embed-model, pull-embed?(n), qa-url,
     # backend(l)
@@ -125,6 +125,7 @@ def test_init_existing_project_local_backend_writes_env(tmp_path, monkeypatch):
         "https://test.atlassian.net",
         "test@example.com",
         "mytoken",
+        "mytoken",      # confirm
         "e",
         "SI",
         "e",
@@ -162,6 +163,7 @@ def test_init_model_selected_by_number(tmp_path, monkeypatch):
         "https://test.atlassian.net",
         "test@example.com",
         "mytoken",
+        "mytoken",      # confirm
         "e",
         "SI",
         "e",
@@ -193,6 +195,7 @@ def test_init_turso_auto_create(tmp_path, monkeypatch):
         "https://test.atlassian.net",
         "test@example.com",
         "mytoken",
+        "mytoken",      # confirm
         "e",
         "SI",
         "e",
@@ -231,6 +234,7 @@ def test_init_turso_manual_entry_when_cli_missing(tmp_path, monkeypatch):
         "https://test.atlassian.net",
         "test@example.com",
         "mytoken",
+        "mytoken",      # confirm
         "e",
         "SI",
         "e",
@@ -276,6 +280,7 @@ def test_init_overwrites_env_when_user_confirms(tmp_path, monkeypatch):
         "https://test.atlassian.net",
         "test@example.com",
         "mytoken",
+        "mytoken",      # confirm
         "e",
         "SI",
         "e",

@@ -133,7 +133,16 @@ def init() -> None:
         "  Atlassian URL", default="https://yourorg.atlassian.net"
     ).rstrip("/")
     collected["atlassian_email"] = typer.prompt("  Email")
-    collected["atlassian_api_token"] = typer.prompt("  API Token", hide_input=True)
+    while True:
+        token = typer.prompt("  API Token", hide_input=True)
+        if not token.strip():
+            console.print("  [red]Token cannot be empty, try again.[/red]")
+            continue
+        token2 = typer.prompt("  Confirm API Token", hide_input=True)
+        if token == token2:
+            collected["atlassian_api_token"] = token
+            break
+        console.print("  [red]Tokens don't match, try again.[/red]")
 
     _jira = _atlassian_session(
         _Jira, collected["atlassian_url"],
