@@ -11,6 +11,66 @@ from atlassian_cli.integrations.jira import JiraClient
 app = typer.Typer(help="Manage Jira issue lifecycle")
 console = Console()
 
+_STATUS_STYLE = {
+    "to do": "dim",
+    "in progress": "yellow",
+    "in review": "cyan",
+    "done": "green",
+}
+
+
+@app.command("list")
+def list_issues(
+    status: Optional[str] = typer.Option(
+        None, "--status", "-s",
+        help="Filter by status: 'open' (not done), 'done', or any Jira status name. Omit for all.",
+    ),
+    jql: Optional[str] = typer.Option(
+        None, "--jql",
+        help="Custom JQL to override the default query.",
+    ),
+) -> None:
+    """List Jira issues in the configured project."""
+    settings = get_settings()
+    project = settings.jira_project
+
+    if jql:
+        query = jql
+    elif status and status.lower() == "open":
+        query = f"project={project} AND statusCategory != Done ORDER BY created DESC"
+    elif status and status.lower() == "done":
+        query = f"project={project} AND statusCategory = Done ORDER BY updated DESC"
+    elif status:
+        query = f"project={project} AND status = \"{status}\" ORDER BY created DESC"
+    else:
+        query = f"project={project} ORDER BY created DESC"
+
+    jira = JiraClient(settings)
+    try:
+        issues = jira.search_issues(query)
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+
+    if not issues:
+        console.print("[yellow]No issues found.[/yellow]")
+        return
+
+    table = Table(show_lines=False, expand=False)
+    table.add_column("Key", style="cyan", no_wrap=True)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Summary")
+
+    for issue in issues:
+        fields = issue["fields"]
+        key = issue["key"]
+        status_name = fields["status"]["name"]
+        style = _STATUS_STYLE.get(status_name.lower(), "white")
+        summary = fields.get("summary", "")
+        table.add_row(key, f"[{style}]{status_name}[/{style}]", summary)
+
+    console.print(table)
+
 
 @app.command("transition")
 def transition(

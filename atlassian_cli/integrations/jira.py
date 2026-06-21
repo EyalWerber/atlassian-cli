@@ -81,9 +81,15 @@ class JiraClient:
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
 
-    def search_issues(self, jql: str) -> list:
+    def search_issues(self, jql: str, fields: Optional[list[str]] = None) -> list:
         try:
-            return self._jira.jql(jql).get("issues", [])
+            body: dict = {"jql": jql, "maxResults": 100}
+            if fields:
+                body["fields"] = fields
+            else:
+                body["fields"] = ["summary", "status", "issuetype", "priority"]
+            result = self._jira.post("rest/api/3/search/jql", data=body)
+            return result.get("issues", [])
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
 
