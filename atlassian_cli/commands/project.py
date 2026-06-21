@@ -133,15 +133,16 @@ def init() -> None:
     collected["atlassian_url"] = typer.prompt(
         "  Atlassian URL", default="https://yourorg.atlassian.net"
     ).rstrip("/")
-    collected["atlassian_email"] = typer.prompt("  Email")
+    collected["atlassian_email"] = typer.prompt("  Email").strip()
     while True:
-        token = typer.prompt("  API Token", hide_input=True)
-        if not token.strip():
+        token = typer.prompt("  API Token", hide_input=True).strip()
+        if not token:
             console.print("  [red]Token cannot be empty, try again.[/red]")
             continue
-        token2 = typer.prompt("  Confirm API Token", hide_input=True)
+        token2 = typer.prompt("  Confirm API Token", hide_input=True).strip()
         if token == token2:
             collected["atlassian_api_token"] = token
+            console.print(f"  [dim]Token accepted ({len(token)} chars)[/dim]")
             break
         console.print("  [red]Tokens don't match, try again.[/red]")
 
