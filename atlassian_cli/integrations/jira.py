@@ -201,6 +201,33 @@ class JiraClient:
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
 
+    def get_project_statuses(self, project_key: Optional[str] = None) -> list[dict]:
+        """Return statuses for the project, deduplicated, ordered by category.
+
+        Each entry: {"name": str, "category_key": str, "category_name": str}
+        category_key values: "new" (To Do), "indeterminate" (In Progress), "done" (Done)
+        """
+        key = project_key or self.project
+        try:
+            issue_types = self._jira.get(f"rest/api/2/project/{key}/statuses")
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+        _ORDER = {"new": 0, "indeterminate": 1, "done": 2}
+        seen: dict[str, dict] = {}
+        for itype in issue_types:
+            for s in itype.get("statuses", []):
+                name = s["name"]
+                if name not in seen:
+                    cat = s.get("statusCategory", {})
+                    seen[name] = {
+                        "name": name,
+                        "category_key": cat.get("key", ""),
+                        "category_name": cat.get("name", ""),
+                    }
+
+        return sorted(seen.values(), key=lambda s: (_ORDER.get(s["category_key"], 99), s["name"]))
+
     def list_links(self, issue_key: str) -> list[dict]:
         try:
             fields = self._jira.issue(issue_key, fields="issuelinks")["fields"]

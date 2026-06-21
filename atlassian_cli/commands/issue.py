@@ -11,12 +11,17 @@ from atlassian_cli.integrations.jira import JiraClient
 app = typer.Typer(help="Manage Jira issue lifecycle")
 console = Console()
 
-_STATUS_STYLE = {
-    "to do": "dim",
-    "in progress": "yellow",
-    "in review": "cyan",
-    "done": "green",
+_CATEGORY_STYLE = {
+    "new": "dim",           # To Do
+    "indeterminate": "yellow",  # In Progress, In QA, In Review, …
+    "done": "green",        # Done
 }
+
+
+def _status_style(status_field: dict) -> str:
+    """Return a Rich style string for a Jira status object (includes statusCategory)."""
+    cat_key = (status_field.get("statusCategory") or {}).get("key", "")
+    return _CATEGORY_STYLE.get(cat_key, "white")
 
 
 @app.command("list")
@@ -65,7 +70,7 @@ def list_issues(
         fields = issue["fields"]
         key = issue["key"]
         status_name = fields["status"]["name"]
-        style = _STATUS_STYLE.get(status_name.lower(), "white")
+        style = _status_style(fields["status"])
         summary = fields.get("summary", "")
         table.add_row(key, f"[{style}]{status_name}[/{style}]", summary)
 
@@ -75,7 +80,7 @@ def list_issues(
 @app.command("transition")
 def transition(
     key: str = typer.Argument(..., help="Issue key, e.g. SI-42"),
-    status: str = typer.Argument(..., help="Target status: 'To Do', 'In Progress', 'In Review', 'Done'"),
+    status: str = typer.Argument(..., help="Target status name, e.g. 'In Progress', 'In QA', 'Done'. Run 'workflow' to see valid values."),
 ) -> None:
     """Transition an issue to a new status."""
     jira = JiraClient(get_settings())
@@ -104,6 +109,29 @@ def transitions(
     table.add_column("To Status")
     for t in result:
         table.add_row(t.get("id", ""), t.get("name", ""), t.get("to", {}).get("name", ""))
+    console.print(table)
+
+
+@app.command("workflow")
+def workflow() -> None:
+    """Show all statuses in the project's workflow, coloured by category."""
+    settings = get_settings()
+    jira = JiraClient(settings)
+    try:
+        statuses = jira.get_project_statuses()
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+
+    table = Table(title=f"Workflow: {settings.jira_project}", show_lines=False)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Category", no_wrap=True)
+    for s in statuses:
+        style = _CATEGORY_STYLE.get(s["category_key"], "white")
+        table.add_row(
+            f"[{style}]{s['name']}[/{style}]",
+            f"[{style}]{s['category_name']}[/{style}]",
+        )
     console.print(table)
 
 
