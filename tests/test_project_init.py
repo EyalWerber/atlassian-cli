@@ -299,3 +299,29 @@ def test_init_overwrites_env_when_user_confirms(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "old=content" not in (tmp_path / ".env").read_text()
     assert "JIRA_PROJECT=SI" in (tmp_path / ".env").read_text()
+
+
+# ── _ensure_gitignored tests ─────────────────────────────────────────────────
+
+def test_ensure_gitignored_appends_when_missing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".git").mkdir()
+    from atlassian_cli.commands.project import _ensure_gitignored
+    _ensure_gitignored(tmp_path / ".env")
+    assert ".env" in (tmp_path / ".gitignore").read_text()
+
+
+def test_ensure_gitignored_skips_when_already_present(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".gitignore").write_text(".env\n", encoding="utf-8")
+    from atlassian_cli.commands.project import _ensure_gitignored
+    _ensure_gitignored(tmp_path / ".env")
+    assert (tmp_path / ".gitignore").read_text().count(".env") == 1
+
+
+def test_ensure_gitignored_skips_outside_git_repo(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from atlassian_cli.commands.project import _ensure_gitignored
+    _ensure_gitignored(tmp_path / ".env")
+    assert not (tmp_path / ".gitignore").exists()
