@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import shutil
 import subprocess
 import types
@@ -56,18 +57,34 @@ def _ollama_pull(model: str) -> bool:
 
 
 def _turso_available() -> bool:
-    return shutil.which("turso") is not None
+    """Return True only if turso CLI is actually runnable (not just present on disk).
+
+    shutil.which finds .cmd wrappers on Windows but subprocess can't run them
+    without shell=True. This function probes with a real invocation to avoid
+    false positives.
+    """
+    try:
+        result = subprocess.run(
+            ["turso", "--version"],
+            capture_output=True,
+            timeout=5,
+            shell=(os.name == "nt"),
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 def _turso_create_db(db_name: str) -> tuple[str, str]:
-    subprocess.run(["turso", "db", "create", db_name], check=True)
+    _sh = os.name == "nt"  # .cmd wrappers on Windows require shell=True
+    subprocess.run(["turso", "db", "create", db_name], check=True, shell=_sh)
     url = subprocess.run(
         ["turso", "db", "show", db_name, "--url"],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True, shell=_sh,
     ).stdout.strip()
     token = subprocess.run(
         ["turso", "db", "tokens", "create", db_name],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True, shell=_sh,
     ).stdout.strip()
     return url, token
 
@@ -295,8 +312,9 @@ def init() -> None:
                         console.print("[green]✓[/green] Turso database created")
                         console.print(f"  [dim]URL: {url}[/dim]")
                     except Exception as exc:
-                        console.print(f"[red]✗[/red] Turso creation failed: {exc}")
-                        raise typer.Exit(1)
+                        console.print(f"[yellow]⚠[/yellow] Turso creation failed: {exc}")
+                        console.print("  [dim]Falling back to local SQLite — you can switch later.[/dim]")
+                        collected["memory_backend"] = "local"
             else:
                 collected["turso_url"] = typer.prompt("  TURSO_URL (libsql://...)")
                 collected["turso_auth_token"] = typer.prompt(
