@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import shutil
 import subprocess
 import types
@@ -16,6 +17,19 @@ from atlassian_cli.integrations.ollama import OllamaClient
 
 app = typer.Typer(help="Initialize and configure a project")
 console = Console()
+
+
+def _atlassian_session(cls, url: str, email: str, token: str):
+    """Instantiate an atlassian client with UTF-8 Basic auth.
+
+    requests._basic_auth_str encodes credentials as latin-1, which raises
+    UnicodeEncodeError for any non-latin-1 character. We bypass it by setting
+    the Authorization header directly using UTF-8 (RFC 7617).
+    """
+    client = cls(url=url, cloud=True)
+    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
+    client._session.headers["Authorization"] = f"Basic {auth}"
+    return client
 
 
 @app.callback()
@@ -121,17 +135,13 @@ def init() -> None:
     collected["atlassian_email"] = typer.prompt("  Email")
     collected["atlassian_api_token"] = typer.prompt("  API Token", hide_input=True)
 
-    _jira = _Jira(
-        url=collected["atlassian_url"],
-        username=collected["atlassian_email"],
-        password=collected["atlassian_api_token"],
-        cloud=True,
+    _jira = _atlassian_session(
+        _Jira, collected["atlassian_url"],
+        collected["atlassian_email"], collected["atlassian_api_token"],
     )
-    _conf = _Confluence(
-        url=collected["atlassian_url"],
-        username=collected["atlassian_email"],
-        password=collected["atlassian_api_token"],
-        cloud=True,
+    _conf = _atlassian_session(
+        _Confluence, collected["atlassian_url"],
+        collected["atlassian_email"], collected["atlassian_api_token"],
     )
 
     # ── Step 2: Jira project ─────────────────────────────────────────────
