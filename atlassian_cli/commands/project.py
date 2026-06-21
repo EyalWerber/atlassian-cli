@@ -145,7 +145,11 @@ def init() -> None:
         proj_key = typer.prompt("  Project key (e.g. MYAPP)").upper()
         with console.status("[bold green]Creating Jira project...[/bold green]"):
             try:
-                _jira.create_project(key=proj_key, name=proj_name)
+                _jira.create_project_from_raw_json({
+                    "key": proj_key,
+                    "name": proj_name,
+                    "projectTypeKey": "software",
+                })
                 console.print(f"[green]✓[/green] Created Jira project: {proj_key}")
             except Exception as exc:
                 console.print(f"[red]✗[/red] Failed to create project: {exc}")
