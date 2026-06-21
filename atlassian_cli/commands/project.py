@@ -29,6 +29,7 @@ def _atlassian_session(cls, url: str, email: str, token: str):
     client = cls(url=url, cloud=True)
     auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
     client._session.headers["Authorization"] = f"Basic {auth}"
+    client._session.auth = None  # prevent any residual session auth from interfering
     return client
 
 
@@ -152,6 +153,24 @@ def init() -> None:
         _Confluence, collected["atlassian_url"],
         collected["atlassian_email"], collected["atlassian_api_token"],
     )
+
+    # Verify credentials before proceeding
+    with console.status("[bold green]Verifying credentials…[/bold green]"):
+        try:
+            _jira.myself()
+            console.print("[green]✓[/green] Credentials verified")
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "401" in str(exc) or "not authenticated" in msg or "unauthorized" in msg:
+                console.print("[red]✗ Authentication failed.[/red] Check your email and API token.")
+                console.print(
+                    "  Create a token at: "
+                    "[link=https://id.atlassian.com/manage-profile/security/api-tokens]"
+                    "https://id.atlassian.com/manage-profile/security/api-tokens[/link]"
+                )
+            else:
+                console.print(f"[red]✗[/red] Could not connect to Jira: {exc}")
+            raise typer.Exit(1)
 
     # ── Step 2: Jira project ─────────────────────────────────────────────
     console.print("\n[bold]Step 2/5[/bold] — Jira Project")
