@@ -158,7 +158,8 @@ def init() -> None:
     # Verify credentials before proceeding
     with console.status("[bold green]Verifying credentials…[/bold green]"):
         try:
-            _jira.myself()
+            _me = _jira.myself()
+            _account_id = _me.get("accountId") if isinstance(_me, dict) else None
             console.print("[green]✓[/green] Credentials verified")
         except Exception as exc:
             msg = str(exc).lower()
@@ -184,11 +185,14 @@ def init() -> None:
         proj_key = typer.prompt("  Project key (e.g. MYAPP)").upper()
         with console.status("[bold green]Creating Jira project...[/bold green]"):
             try:
-                _jira.create_project_from_raw_json({
+                payload: dict = {
                     "key": proj_key,
                     "name": proj_name,
                     "projectTypeKey": "software",
-                })
+                }
+                if _account_id:
+                    payload["leadAccountId"] = _account_id
+                _jira.create_project_from_raw_json(payload)
                 console.print(f"[green]✓[/green] Created Jira project: {proj_key}")
             except Exception as exc:
                 console.print(f"[red]✗[/red] Failed to create project: {exc}")
