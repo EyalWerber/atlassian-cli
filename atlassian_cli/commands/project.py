@@ -454,3 +454,208 @@ def init() -> None:
     console.print(
         f"\n[green]Done![/green] Run [bold]atlassian feature create[/bold] to get started."
     )
+
+
+# ── helpers for standardize ───────────────────────────────────────────────────
+
+def _make_api_session(url: str, email: str, token: str) -> requests.Session:
+    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
+    s = requests.Session()
+    s.headers.update({"Authorization": f"Basic {auth}", "Accept": "application/json", "Content-Type": "application/json"})
+    return s
+
+
+def _api_get(session: requests.Session, base: str, path: str, params: dict | None = None) -> dict | list:
+    r = session.get(f"{base}{path}", params=params)
+    r.raise_for_status()
+    return r.json()
+
+
+def _api_post(session: requests.Session, base: str, path: str, data: dict) -> dict:
+    r = session.post(f"{base}{path}", json=data)
+    r.raise_for_status()
+    return r.json()
+
+
+def _api_put(session: requests.Session, base: str, path: str, data: dict) -> dict:
+    r = session.put(f"{base}{path}", json=data)
+    r.raise_for_status()
+    return r.json() if r.text else {}
+
+
+def _project_statuses(session: requests.Session, base: str, project_key: str) -> list[str]:
+    """Return flat list of all status names for a project (across all issue types)."""
+    try:
+        data = _api_get(session, base, f"/rest/api/2/project/{project_key}/statuses")
+        names: list[str] = []
+        for itype in data:
+            for s in itype.get("statuses", []):
+                if s["name"] not in names:
+                    names.append(s["name"])
+        return names
+    except Exception:
+        return []
+
+
+def _all_projects(session: requests.Session, base: str) -> list[dict]:
+    """Paginate through all projects, requesting issue types in the expand."""
+    projects: list[dict] = []
+    start = 0
+    while True:
+        page = _api_get(session, base, "/rest/api/3/project/search", {
+            "maxResults": 50, "startAt": start, "expand": "issueTypes",
+        })
+        projects.extend(page.get("values", []))
+        if page.get("isLast", True):
+            break
+        start += len(page["values"])
+    return projects
+
+
+@app.command("standardize")
+def standardize(
+    reference: str = typer.Option("PYTHAGO", "--reference", "-r", help="Project key to copy workflow from"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview changes without applying them"),
+) -> None:
+    """Apply Feature issue type (green) and reference-project workflow to every project missing them."""
+    from atlassian_cli.config import get_settings
+    settings = get_settings()
+
+    base = settings.atlassian_url.rstrip("/")
+    email = settings.atlassian_email
+    token = settings.atlassian_api_token.get_secret_value()
+    session = _make_api_session(base, email, token)
+
+    # ── auth check ──────────────────────────────────────────────────────
+    try:
+        me = _api_get(session, base, "/rest/api/3/myself")
+        console.print(f"[dim]Authenticated as {me['displayName']}[/dim]")
+    except Exception as e:
+        console.print(f"[red]✗[/red]  Auth failed — refresh your API token: {e}")
+        raise typer.Exit(1)
+
+    if dry_run:
+        console.print("[yellow]DRY RUN — no changes will be made[/yellow]")
+
+    # ── load all projects ────────────────────────────────────────────────
+    with console.status("Loading projects…"):
+        all_projects = _all_projects(session, base)
+
+    console.print(f"[dim]{len(all_projects)} project(s) found[/dim]")
+
+    # ── resolve reference project ────────────────────────────────────────
+    ref = next((p for p in all_projects if p["key"] == reference), None)
+    if not ref:
+        console.print(f"[red]✗[/red]  Reference project '{reference}' not found.")
+        raise typer.Exit(1)
+
+    # ── reference workflow scheme ────────────────────────────────────────
+    ref_wf_scheme_id: str | None = None
+    try:
+        wf_resp = _api_get(session, base, "/rest/api/3/workflowscheme/project", {"projectId": ref["id"]})
+        entries = wf_resp.get("values", wf_resp) if isinstance(wf_resp, dict) else wf_resp
+        if entries:
+            entry = entries[0]
+            ref_wf_scheme_id = str(
+                entry.get("workflowScheme", entry).get("id", entry.get("id", ""))
+            )
+    except Exception as e:
+        console.print(f"[yellow]⚠[/yellow]  Could not read {reference} workflow scheme: {e}")
+
+    # ── check reference has IN QA ────────────────────────────────────────
+    ref_statuses = _project_statuses(session, base, reference)
+    in_qa_in_ref = any("IN QA" in s.upper() for s in ref_statuses)
+    if not in_qa_in_ref:
+        console.print(f"[yellow]⚠[/yellow]  '{reference}' has no 'IN QA' status — double-check the reference key.")
+
+    # ── find or create Feature issue type (green = Story avatar) ────────
+    all_types: list[dict] = _api_get(session, base, "/rest/api/3/issuetype")  # type: ignore[assignment]
+    feature_type = next((t for t in all_types if t["name"].lower() == "feature"), None)
+
+    if not feature_type:
+        # Borrow the Story type's avatarId for a green icon; fall back to 10315
+        story_type = next((t for t in all_types if t["name"].lower() == "story"), None)
+        green_avatar = story_type.get("avatarId", 10315) if story_type else 10315
+        if dry_run:
+            console.print("[yellow]Would create:[/yellow] 'Feature' issue type (avatarId from Story)")
+            feature_type = {"id": "__dry_run__", "name": "Feature"}
+        else:
+            try:
+                feature_type = _api_post(session, base, "/rest/api/3/issuetype", {
+                    "name": "Feature",
+                    "description": "A new feature or product improvement",
+                    "type": "standard",
+                    "avatarId": green_avatar,
+                })
+                console.print(f"[green]✓[/green] Created 'Feature' issue type [id={feature_type['id']}]")
+            except Exception as e:
+                console.print(f"[red]✗[/red]  Could not create Feature issue type: {e}")
+                raise typer.Exit(1)
+    else:
+        console.print(f"[dim]'Feature' issue type already exists (id={feature_type['id']})[/dim]")
+
+    # ── process each project ─────────────────────────────────────────────
+    changed = 0
+    skipped = 0
+    for project in all_projects:
+        pkey = project["key"]
+        if pkey == reference:
+            continue
+
+        pstyle = project.get("style", "classic")
+        pname = project["name"]
+        existing_type_names = {t["name"].lower() for t in project.get("issueTypes", [])}
+        needs_feature = "feature" not in existing_type_names
+
+        statuses = _project_statuses(session, base, pkey)
+        needs_workflow = not any("IN QA" in s.upper() for s in statuses)
+
+        if not needs_feature and not needs_workflow:
+            console.print(f"[dim]{pkey:12} ✓  already standardized[/dim]")
+            skipped += 1
+            continue
+
+        parts = []
+        if needs_feature:
+            parts.append("Feature type")
+        if needs_workflow:
+            parts.append("IN QA workflow")
+        console.print(f"[yellow]{pkey:12}[/yellow]  needs: {', '.join(parts)}")
+
+        if dry_run:
+            continue
+
+        # ─ add Feature issue type to this project's scheme
+        if needs_feature:
+            try:
+                scheme_resp = _api_get(session, base, "/rest/api/3/issuetypescheme/project", {"projectId": project["id"]})
+                scheme_entries = scheme_resp.get("values", [])
+                if scheme_entries:
+                    scheme_id = scheme_entries[0]["issueTypeScheme"]["id"]
+                    _api_put(session, base, f"/rest/api/3/issuetypescheme/{scheme_id}/issuetype", {
+                        "issueTypeIds": [feature_type["id"]],
+                    })
+                    console.print(f"  [green]✓[/green] Added Feature to {pkey}")
+                    changed += 1
+                else:
+                    console.print(f"  [yellow]⚠[/yellow]  No issue type scheme found for {pkey}")
+            except Exception as e:
+                console.print(f"  [red]✗[/red]  Feature type: {e}")
+
+        # ─ apply reference workflow scheme (classic projects only)
+        if needs_workflow:
+            if pstyle != "classic":
+                console.print(f"  [dim]Workflow skipped — {pkey} is team-managed (next-gen); change workflow in the board settings[/dim]")
+            elif not ref_wf_scheme_id:
+                console.print(f"  [yellow]⚠[/yellow]  Workflow skipped — could not read {reference}'s scheme")
+            else:
+                try:
+                    _api_put(session, base, f"/rest/api/3/workflowscheme/{ref_wf_scheme_id}/project", {
+                        "projectId": project["id"],
+                    })
+                    console.print(f"  [green]✓[/green] Applied {reference} workflow to {pkey}")
+                    changed += 1
+                except Exception as e:
+                    console.print(f"  [red]✗[/red]  Workflow: {e}")
+
+    console.print(f"\n[bold]Done.[/bold] {changed} change(s) applied, {skipped} already compliant.")
