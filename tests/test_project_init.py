@@ -6,7 +6,11 @@ import pytest
 from typer.testing import CliRunner
 
 from atlassian_cli.commands.project import (
+    _PROGRESS_FILE,
+    _clear_progress,
+    _load_progress,
     _ollama_list_models,
+    _save_progress,
     _turso_create_db,
     _write_env,
     app,
@@ -330,3 +334,94 @@ def test_ensure_gitignored_skips_outside_git_repo(tmp_path, monkeypatch):
     from atlassian_cli.commands.project import _ensure_gitignored
     _ensure_gitignored(tmp_path / ".env")
     assert not (tmp_path / ".gitignore").exists()
+
+
+# ── Progress / resume tests ──────────────────────────────────────────────────
+
+def test_save_and_load_progress_excludes_token(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    data = {"atlassian_url": "https://test.atlassian.net", "atlassian_api_token": "secret", "jira_project": "SI"}
+    _save_progress(data, 2)
+    loaded = _load_progress()
+    assert loaded["completed_step"] == 2
+    assert loaded["data"]["atlassian_url"] == "https://test.atlassian.net"
+    assert loaded["data"]["jira_project"] == "SI"
+    assert "atlassian_api_token" not in loaded["data"]
+
+
+def test_clear_progress_removes_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _save_progress({"atlassian_url": "x"}, 1)
+    assert (tmp_path / ".atlassian-init-progress.json").exists()
+    _clear_progress()
+    assert not (tmp_path / ".atlassian-init-progress.json").exists()
+
+
+def test_load_progress_returns_none_when_absent(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert _load_progress() is None
+
+
+def test_init_resumes_from_confluence_step(tmp_path, monkeypatch):
+    """Progress saved at step 2 (Jira done) → wizard skips to Confluence."""
+    monkeypatch.chdir(tmp_path)
+    # Pre-write a progress file as if Jira completed but Confluence hadn't started
+    _save_progress({
+        "atlassian_url": "https://test.atlassian.net",
+        "atlassian_email": "test@example.com",
+        "jira_project": "SI",
+    }, 2)
+
+    # Input: y=resume, then credentials, then confluence (new), then ollama, then backend
+    user_input = "\n".join([
+        "y",            # resume?
+        "https://test.atlassian.net",   # URL (pre-filled, user hits enter)
+        "test@example.com",             # email (pre-filled)
+        "mytoken",
+        "mytoken",      # confirm
+        "n",            # create new Confluence space
+        "My Space",
+        "SIDEV",
+        "",             # ollama host default
+        "llama3.2",
+        "",             # embed model default
+        "n",            # don't pull embed
+        "",             # qa url
+        "l",            # local backend
+    ])
+
+    with patch("atlassian_cli.commands.project._Jira") as MockJira, \
+         patch("atlassian_cli.commands.project._Confluence") as MockConf, \
+         patch("atlassian_cli.commands.project._ollama_list_models", return_value=[]), \
+         patch("atlassian_cli.commands.project._ollama_pull", return_value=True), \
+         patch("atlassian_cli.commands.project.OllamaClient") as MockOllama:
+        MockOllama.return_value.ping.return_value = False
+        result = runner.invoke(app, ["init"], input=user_input)
+
+    assert result.exit_code == 0, result.output
+    content = (tmp_path / ".env").read_text()
+    assert "JIRA_PROJECT=SI" in content
+    assert "CONFLUENCE_SPACE=SIDEV" in content
+    # Progress file must be deleted after successful completion
+    assert not (tmp_path / ".atlassian-init-progress.json").exists()
+
+
+def test_init_progress_deleted_on_completion(tmp_path, monkeypatch):
+    """Progress file is removed when the wizard completes successfully."""
+    monkeypatch.chdir(tmp_path)
+    user_input = "\n".join([
+        "https://test.atlassian.net", "test@example.com",
+        "mytoken", "mytoken",
+        "e", "SI",
+        "e", "SIDEV",
+        "", "llama3.2", "", "n", "", "l",
+    ])
+    with patch("atlassian_cli.commands.project._Jira"), \
+         patch("atlassian_cli.commands.project._Confluence"), \
+         patch("atlassian_cli.commands.project._ollama_list_models", return_value=[]), \
+         patch("atlassian_cli.commands.project._ollama_pull", return_value=True), \
+         patch("atlassian_cli.commands.project.OllamaClient") as MockOllama:
+        MockOllama.return_value.ping.return_value = False
+        result = runner.invoke(app, ["init"], input=user_input)
+    assert result.exit_code == 0, result.output
+    assert not (tmp_path / ".atlassian-init-progress.json").exists()

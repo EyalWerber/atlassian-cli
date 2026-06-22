@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import shutil
 import subprocess
@@ -89,6 +90,37 @@ def _turso_create_db(db_name: str) -> tuple[str, str]:
     return url, token
 
 
+_PROGRESS_FILE = Path(".atlassian-init-progress.json")
+_STEP_NAMES = {
+    2: "Jira Project",
+    3: "Confluence Space",
+    4: "Ollama Model",
+    5: "Memory Backend",
+}
+
+
+def _load_progress() -> dict | None:
+    if _PROGRESS_FILE.exists():
+        try:
+            return json.loads(_PROGRESS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    return None
+
+
+def _save_progress(data: dict, completed_step: int) -> None:
+    safe = {k: v for k, v in data.items() if k != "atlassian_api_token"}
+    _PROGRESS_FILE.write_text(
+        json.dumps({"version": 1, "completed_step": completed_step, "data": safe}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _clear_progress() -> None:
+    if _PROGRESS_FILE.exists():
+        _PROGRESS_FILE.unlink()
+
+
 def _ensure_gitignored(env_path: Path) -> None:
     """Append .env to .gitignore if a git repo is detected and the file isn't already ignored."""
     gitignore = Path(".gitignore")
@@ -137,20 +169,39 @@ def init() -> None:
         title="[cyan]atlassian project init[/cyan]",
     ))
 
+    # ── Resume check ─────────────────────────────────────────────────────
+    collected: dict = {}
+    resume_from = 0
+
+    progress = _load_progress()
+    if progress:
+        completed = progress.get("completed_step", 0)
+        next_step = completed + 1
+        next_name = _STEP_NAMES.get(next_step)
+        if next_name and typer.confirm(
+            f"\nPrevious setup stopped before [bold]{next_name}[/bold]. Continue from there?",
+            default=True,
+        ):
+            resume_from = next_step
+            collected.update(progress.get("data", {}))
+            console.print("  [dim]API token must be re-entered for security.[/dim]")
+        else:
+            _clear_progress()
+
     env_path = Path(".env")
-    if env_path.exists():
+    if not resume_from and env_path.exists():
         if not typer.confirm("\n.env already exists. Overwrite?", default=False):
             console.print("[dim]Cancelled.[/dim]")
             raise typer.Exit(0)
 
-    collected: dict = {}
-
-    # ── Step 1: Credentials ──────────────────────────────────────────────
+    # ── Step 1: Credentials (always re-entered) ──────────────────────────
     console.print("\n[bold]Step 1/5[/bold] — Atlassian Credentials")
+    _url_default = collected.get("atlassian_url", "https://yourorg.atlassian.net")
     collected["atlassian_url"] = typer.prompt(
-        "  Atlassian URL", default="https://yourorg.atlassian.net"
+        "  Atlassian URL", default=_url_default
     ).rstrip("/")
-    collected["atlassian_email"] = typer.prompt("  Email").strip()
+    _email_kw: dict = ({"default": collected["atlassian_email"]} if "atlassian_email" in collected else {})
+    collected["atlassian_email"] = typer.prompt("  Email", **_email_kw).strip()
     while True:
         token = typer.prompt("  API Token", hide_input=True).strip()
         if not token:
@@ -172,7 +223,6 @@ def init() -> None:
         collected["atlassian_email"], collected["atlassian_api_token"],
     )
 
-    # Verify credentials before proceeding
     with console.status("[bold green]Verifying credentials…[/bold green]"):
         try:
             _me = _jira.myself()
@@ -191,103 +241,122 @@ def init() -> None:
                 console.print(f"[red]✗[/red] Could not connect to Jira: {exc}")
             raise typer.Exit(1)
 
-    # ── Step 2: Jira project ─────────────────────────────────────────────
-    console.print("\n[bold]Step 2/5[/bold] — Jira Project")
-    jira_choice = typer.prompt(
-        "  (n) Create new project  (e) Use existing", default="e"
-    ).strip().lower()
+    _save_progress(collected, 1)
 
-    if jira_choice == "n":
-        proj_name = typer.prompt("  Project name")
-        proj_key = typer.prompt("  Project key (e.g. MYAPP)").upper()
-        with console.status("[bold green]Creating Jira project...[/bold green]"):
-            try:
-                payload: dict = {
-                    "key": proj_key,
-                    "name": proj_name,
-                    "projectTypeKey": "software",
-                }
-                if _account_id:
-                    payload["leadAccountId"] = _account_id
-                _jira.create_project_from_raw_json(payload)
-                console.print(f"[green]✓[/green] Created Jira project: {proj_key}")
-            except Exception as exc:
-                console.print(f"[red]✗[/red] Failed to create project: {exc}")
-                raise typer.Exit(1)
-        collected["jira_project"] = proj_key
+    # ── Step 2: Jira project ─────────────────────────────────────────────
+    if resume_from > 2:
+        console.print(f"\n[dim]Step 2/5 — Jira Project: {collected.get('jira_project')} ✓[/dim]")
     else:
-        proj_key = typer.prompt("  Project key", default="MYAPP").upper()
-        try:
-            _jira.project(proj_key)
-            console.print(f"[green]✓[/green] Found Jira project: {proj_key}")
-        except Exception:
-            console.print(f"[yellow]⚠[/yellow]  Could not verify project {proj_key} — continuing")
-        collected["jira_project"] = proj_key
+        console.print("\n[bold]Step 2/5[/bold] — Jira Project")
+        jira_choice = typer.prompt(
+            "  (n) Create new project  (e) Use existing", default="e"
+        ).strip().lower()
+
+        if jira_choice == "n":
+            proj_name = typer.prompt("  Project name")
+            proj_key = typer.prompt("  Project key (e.g. MYAPP)").upper()
+            with console.status("[bold green]Creating Jira project...[/bold green]"):
+                try:
+                    payload: dict = {
+                        "key": proj_key,
+                        "name": proj_name,
+                        "projectTypeKey": "software",
+                    }
+                    if _account_id:
+                        payload["leadAccountId"] = _account_id
+                    _jira.create_project_from_raw_json(payload)
+                    console.print(f"[green]✓[/green] Created Jira project: {proj_key}")
+                except Exception as exc:
+                    console.print(f"[red]✗[/red] Failed to create project: {exc}")
+                    raise typer.Exit(1)
+            collected["jira_project"] = proj_key
+        else:
+            proj_key = typer.prompt("  Project key", default="MYAPP").upper()
+            try:
+                _jira.project(proj_key)
+                console.print(f"[green]✓[/green] Found Jira project: {proj_key}")
+            except Exception:
+                console.print(f"[yellow]⚠[/yellow]  Could not verify project {proj_key} — continuing")
+            collected["jira_project"] = proj_key
+
+        _save_progress(collected, 2)
 
     # ── Step 3: Confluence space ─────────────────────────────────────────
-    console.print("\n[bold]Step 3/5[/bold] — Confluence Space")
-    conf_choice = typer.prompt(
-        "  (n) Create new space  (e) Use existing", default="e"
-    ).strip().lower()
-
-    if conf_choice == "n":
-        space_name = typer.prompt("  Space name")
-        space_key = typer.prompt("  Space key (e.g. DEV)").upper()
-        with console.status("[bold green]Creating Confluence space...[/bold green]"):
-            try:
-                _conf.create_space(space_key, space_name)
-                console.print(f"[green]✓[/green] Created Confluence space: {space_key}")
-            except Exception as exc:
-                console.print(f"[red]✗[/red] Failed to create space: {exc}")
-                raise typer.Exit(1)
-        collected["confluence_space"] = space_key
+    if resume_from > 3:
+        console.print(f"\n[dim]Step 3/5 — Confluence Space: {collected.get('confluence_space')} ✓[/dim]")
     else:
-        space_key = typer.prompt("  Space key", default="DEV").upper()
-        try:
-            _conf.get_space(space_key)
-            console.print(f"[green]✓[/green] Found Confluence space: {space_key}")
-        except Exception:
-            console.print(f"[yellow]⚠[/yellow]  Could not verify space {space_key} — continuing")
-        collected["confluence_space"] = space_key
+        console.print("\n[bold]Step 3/5[/bold] — Confluence Space")
+        conf_choice = typer.prompt(
+            "  (n) Create new space  (e) Use existing", default="e"
+        ).strip().lower()
+
+        if conf_choice == "n":
+            space_name = typer.prompt("  Space name")
+            space_key = typer.prompt("  Space key (e.g. DEV)").upper()
+            with console.status("[bold green]Creating Confluence space...[/bold green]"):
+                try:
+                    _conf.create_space(space_key, space_name)
+                    console.print(f"[green]✓[/green] Created Confluence space: {space_key}")
+                except Exception as exc:
+                    console.print(f"[red]✗[/red] Failed to create space: {exc}")
+                    raise typer.Exit(1)
+            collected["confluence_space"] = space_key
+        else:
+            space_key = typer.prompt("  Space key", default="DEV").upper()
+            try:
+                _conf.get_space(space_key)
+                console.print(f"[green]✓[/green] Found Confluence space: {space_key}")
+            except Exception:
+                console.print(f"[yellow]⚠[/yellow]  Could not verify space {space_key} — continuing")
+            collected["confluence_space"] = space_key
+
+        _save_progress(collected, 3)
 
     # ── Step 4: Ollama ───────────────────────────────────────────────────
-    console.print("\n[bold]Step 4/5[/bold] — Ollama Model")
-    collected["ollama_host"] = typer.prompt(
-        "  Ollama host", default="http://localhost:11434"
-    )
-    models = _ollama_list_models(collected["ollama_host"])
-
-    if models:
-        console.print("  Available models:")
-        for i, m in enumerate(models, 1):
-            console.print(f"    {i}. {m}")
-        console.print("  Enter a number to select, or type a model name to download it.")
-        raw = typer.prompt("  Model", default="1")
-        if raw.isdigit() and 1 <= int(raw) <= len(models):
-            collected["ollama_model"] = models[int(raw) - 1]
-        else:
-            collected["ollama_model"] = raw
-            if raw not in models:
-                if typer.confirm(f"  Pull {raw}?", default=True):
-                    with console.status(f"Pulling {raw}…"):
-                        _ollama_pull(raw)
+    if resume_from > 4:
+        console.print(f"\n[dim]Step 4/5 — Ollama: {collected.get('ollama_model')} ✓[/dim]")
     else:
-        console.print("  [dim](Ollama not reachable or no models installed)[/dim]")
-        collected["ollama_model"] = typer.prompt("  Model name", default="llama3.2")
+        console.print("\n[bold]Step 4/5[/bold] — Ollama Model")
+        collected["ollama_host"] = typer.prompt(
+            "  Ollama host", default=collected.get("ollama_host", "http://localhost:11434")
+        )
+        models = _ollama_list_models(collected["ollama_host"])
 
-    embed_default = "nomic-embed-text"
-    embed_hint = "[green]installed[/green]" if embed_default in models else "[yellow]not installed[/yellow]"
-    collected["ollama_embed_model"] = typer.prompt(
-        f"  Embed model  ({embed_hint})", default=embed_default
-    )
-    if collected["ollama_embed_model"] not in models:
-        if typer.confirm(f"  Pull {collected['ollama_embed_model']}?", default=True):
-            with console.status(f"Pulling {collected['ollama_embed_model']}…"):
-                _ollama_pull(collected["ollama_embed_model"])
+        if models:
+            console.print("  Available models:")
+            for i, m in enumerate(models, 1):
+                console.print(f"    {i}. {m}")
+            console.print("  Enter a number to select, or type a model name to download it.")
+            raw = typer.prompt("  Model", default="1")
+            if raw.isdigit() and 1 <= int(raw) <= len(models):
+                collected["ollama_model"] = models[int(raw) - 1]
+            else:
+                collected["ollama_model"] = raw
+                if raw not in models:
+                    if typer.confirm(f"  Pull {raw}?", default=True):
+                        with console.status(f"Pulling {raw}…"):
+                            _ollama_pull(raw)
+        else:
+            console.print("  [dim](Ollama not reachable or no models installed)[/dim]")
+            collected["ollama_model"] = typer.prompt(
+                "  Model name", default=collected.get("ollama_model", "llama3.2")
+            )
 
-    collected["qa_base_url"] = typer.prompt(
-        "  QA base URL (optional, for test runner)", default=""
-    )
+        embed_default = "nomic-embed-text"
+        embed_hint = "[green]installed[/green]" if embed_default in models else "[yellow]not installed[/yellow]"
+        collected["ollama_embed_model"] = typer.prompt(
+            f"  Embed model  ({embed_hint})", default=embed_default
+        )
+        if collected["ollama_embed_model"] not in models:
+            if typer.confirm(f"  Pull {collected['ollama_embed_model']}?", default=True):
+                with console.status(f"Pulling {collected['ollama_embed_model']}…"):
+                    _ollama_pull(collected["ollama_embed_model"])
+
+        collected["qa_base_url"] = typer.prompt(
+            "  QA base URL (optional, for test runner)", default=""
+        )
+
+        _save_progress(collected, 4)
 
     # ── Step 5: Memory backend ───────────────────────────────────────────
     console.print("\n[bold]Step 5/5[/bold] — Memory Backend")
@@ -306,9 +375,9 @@ def init() -> None:
                 db_name = typer.prompt("  Database name", default="atlassian-memory")
                 with console.status("[bold green]Creating Turso database...[/bold green]"):
                     try:
-                        url, token = _turso_create_db(db_name)
+                        url, tok = _turso_create_db(db_name)
                         collected["turso_url"] = url
-                        collected["turso_auth_token"] = token
+                        collected["turso_auth_token"] = tok
                         console.print("[green]✓[/green] Turso database created")
                         console.print(f"  [dim]URL: {url}[/dim]")
                     except Exception as exc:
@@ -332,10 +401,11 @@ def init() -> None:
     else:
         collected["memory_backend"] = "local"
 
-    # ── Write .env ───────────────────────────────────────────────────────
+    # ── Write .env and clean up progress ─────────────────────────────────
     _write_env(collected, env_path)
     console.print(f"\n[green]✓[/green] Written: {env_path.resolve()}")
     _ensure_gitignored(env_path)
+    _clear_progress()
 
     # ── Verify connections ───────────────────────────────────────────────
     console.print("\n[bold]Verifying connections…[/bold]")
