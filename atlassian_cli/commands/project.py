@@ -195,7 +195,11 @@ def init() -> None:
             raise typer.Exit(0)
 
     # ── Step 1: Credentials (always re-entered) ──────────────────────────
-    console.print("\n[bold]Step 1/5[/bold] — Atlassian Credentials")
+    if resume_from > 0:
+        console.print(f"\n[bold]Resuming from Step {resume_from}/5 — {_STEP_NAMES[resume_from]}[/bold]")
+        console.print("[dim]Re-entering credentials is required for security.[/dim]")
+    else:
+        console.print("\n[bold]Step 1/5[/bold] — Atlassian Credentials")
     _url_default = collected.get("atlassian_url", "https://yourorg.atlassian.net")
     collected["atlassian_url"] = typer.prompt(
         "  Atlassian URL", default=_url_default
@@ -241,7 +245,8 @@ def init() -> None:
                 console.print(f"[red]✗[/red] Could not connect to Jira: {exc}")
             raise typer.Exit(1)
 
-    _save_progress(collected, 1)
+    # Preserve progress from previous steps already completed
+    _save_progress(collected, max(1, resume_from - 1))
 
     # ── Step 2: Jira project ─────────────────────────────────────────────
     if resume_from > 2:
@@ -276,7 +281,9 @@ def init() -> None:
                 _jira.project(proj_key)
                 console.print(f"[green]✓[/green] Found Jira project: {proj_key}")
             except Exception:
-                console.print(f"[yellow]⚠[/yellow]  Could not verify project {proj_key} — continuing")
+                console.print(f"[yellow]⚠[/yellow]  Could not verify project {proj_key}.")
+                if not typer.confirm("  Continue anyway (set manually in .env later)?", default=False):
+                    raise typer.Exit(1)
             collected["jira_project"] = proj_key
 
         _save_progress(collected, 2)
@@ -307,7 +314,9 @@ def init() -> None:
                 _conf.get_space(space_key)
                 console.print(f"[green]✓[/green] Found Confluence space: {space_key}")
             except Exception:
-                console.print(f"[yellow]⚠[/yellow]  Could not verify space {space_key} — continuing")
+                console.print(f"[yellow]⚠[/yellow]  Could not verify space {space_key}.")
+                if not typer.confirm("  Continue anyway (set manually in .env later)?", default=False):
+                    raise typer.Exit(1)
             collected["confluence_space"] = space_key
 
         _save_progress(collected, 3)
