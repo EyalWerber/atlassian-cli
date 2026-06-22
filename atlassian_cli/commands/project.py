@@ -235,7 +235,7 @@ def init() -> None:
         space_key = typer.prompt("  Space key (e.g. DEV)").upper()
         with console.status("[bold green]Creating Confluence space...[/bold green]"):
             try:
-                _conf.create_space(space_name, space_key)
+                _conf.create_space(space_key, space_name)
                 console.print(f"[green]✓[/green] Created Confluence space: {space_key}")
             except Exception as exc:
                 console.print(f"[red]✗[/red] Failed to create space: {exc}")
