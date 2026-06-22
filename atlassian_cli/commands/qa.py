@@ -227,7 +227,7 @@ def bug(
                 f"Bug {bug_key} filed: [{qa_id}] scenario '{scenario}'. "
                 f"Actual: {actual}. Expected: {expected}."
             ),
-            type=MemoryType.note,
+            type=MemoryType.bug,
             tags=["bug"],
             feature_id=plan.feature_id,
             qa_id=qa_id,

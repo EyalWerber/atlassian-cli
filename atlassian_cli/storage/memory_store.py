@@ -65,7 +65,13 @@ class MemoryStore:
             self._conn.commit()
 
     def _init_chroma(self) -> None:
-        self._collection = None
+        try:
+            import chromadb
+            self._vector_path.mkdir(parents=True, exist_ok=True)
+            client = chromadb.PersistentClient(path=str(self._vector_path))
+            self._collection = client.get_or_create_collection("memories")
+        except Exception:
+            self._collection = None
 
     def _rows(self, query: str, params: tuple = ()) -> list:
         cursor = self._conn.execute(query, params)
@@ -238,24 +244,27 @@ class MemoryStore:
                 )
                 vector = self._ollama.embed(row["content"])
                 tags_raw = row["tags"] if isinstance(row["tags"], str) else json.dumps(row["tags"])
-                self._collection.upsert(
-                    ids=[row["id"]],
-                    embeddings=[vector],
-                    documents=[row["content"]],
-                    metadatas=[{
-                        "type": row["type"], "tags": tags_raw,
-                        "feature_id": row["feature_id"] or "",
-                        "prd_id": row["prd_id"] or "",
-                        "plan_id": row["plan_id"] or "",
-                        "qa_id": row["qa_id"] or "",
-                    }],
-                )
+                if self._collection is not None:
+                    self._collection.upsert(
+                        ids=[row["id"]],
+                        embeddings=[vector],
+                        documents=[row["content"]],
+                        metadatas=[{
+                            "type": row["type"], "tags": tags_raw,
+                            "feature_id": row["feature_id"] or "",
+                            "prd_id": row["prd_id"] or "",
+                            "plan_id": row["plan_id"] or "",
+                            "qa_id": row["qa_id"] or "",
+                        }],
+                    )
                 count += 1
         if count:
             self._conn.commit()
         return count
 
     def sync_vectors(self) -> int:
+        if self._collection is None:
+            return 0
         all_memories = self.list(limit=100_000)
         existing_ids = set(self._collection.get()["ids"])
         count = 0

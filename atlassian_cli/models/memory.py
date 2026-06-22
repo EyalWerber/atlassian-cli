@@ -8,6 +8,7 @@ class MemoryType(str, Enum):
     decision = "decision"
     context = "context"
     note = "note"
+    bug = "bug"
 
 
 class Memory(BaseModel):

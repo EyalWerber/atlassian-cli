@@ -23,6 +23,11 @@ class TestConfig:
         monkeypatch.setenv("CONFLUENCE_SPACE", "DEV")
         monkeypatch.delenv("MEMORY_BACKEND", raising=False)
 
+        # Prevent both ~/.atlassian-cli/.env and local .env from leaking MEMORY_BACKEND=turso
+        import pathlib
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(pathlib.Path, "home", lambda: tmp_path)
+
         import importlib
         import atlassian_cli.config as config_module
         importlib.reload(config_module)

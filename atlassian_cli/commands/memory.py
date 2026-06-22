@@ -229,7 +229,7 @@ def snapshot() -> None:
         mem_store = _build_mem_store(settings)
         decisions = mem_store.list(type=MemoryType.decision, limit=50)
         contexts = mem_store.list(type=MemoryType.context, limit=50)
-        bugs = mem_store.list(type=MemoryType.note, tag="bug", limit=10)
+        bugs = mem_store.list(type=MemoryType.bug, limit=10)
     except Exception:
         console.print("[dim]  (memory store unavailable — CLAUDE.md will contain ADRs only)[/dim]")
 

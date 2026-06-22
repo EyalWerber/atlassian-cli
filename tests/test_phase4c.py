@@ -30,7 +30,7 @@ class TestMemorySnapshot:
                 return [MagicMock(id="MEM-001", content="Chose JWT over sessions")]
             if type and type.value == "context":
                 return [MagicMock(id="MEM-002", content="Auth uses Redis fallback")]
-            if tag == "bug":
+            if type and type.value == "bug":
                 return [MagicMock(id="MEM-003", content="Bug BUG-123 filed: login 500")]
             return []
         mock_store.list.side_effect = mock_list
