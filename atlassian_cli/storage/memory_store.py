@@ -95,15 +95,6 @@ class MemoryStore:
         return f"MEM-{row[0]:03d}"
 
     def add(self, memory: Memory) -> Memory:
-        vector = self._ollama.embed(memory.content)
-        metadata = {
-            "type": memory.type.value,
-            "tags": json.dumps(memory.tags),
-            "feature_id": memory.feature_id or "",
-            "prd_id": memory.prd_id or "",
-            "plan_id": memory.plan_id or "",
-            "qa_id": memory.qa_id or "",
-        }
         self._conn.execute(
             """INSERT INTO memories
                (id, content, type, tags, feature_id, prd_id, plan_id, qa_id, created_at, updated_at)
@@ -118,13 +109,6 @@ class MemoryStore:
             self._conn.execute(
                 "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
                 (memory.id, memory.content),
-            )
-        if self._collection is not None:
-            self._collection.upsert(
-                ids=[memory.id],
-                embeddings=[vector],
-                documents=[memory.content],
-                metadatas=[metadata],
             )
         self._conn.commit()
         return memory
@@ -242,21 +226,6 @@ class MemoryStore:
                     "INSERT INTO memories_fts(id, content) VALUES (?, ?)",
                     (row["id"], row["content"]),
                 )
-                vector = self._ollama.embed(row["content"])
-                tags_raw = row["tags"] if isinstance(row["tags"], str) else json.dumps(row["tags"])
-                if self._collection is not None:
-                    self._collection.upsert(
-                        ids=[row["id"]],
-                        embeddings=[vector],
-                        documents=[row["content"]],
-                        metadatas=[{
-                            "type": row["type"], "tags": tags_raw,
-                            "feature_id": row["feature_id"] or "",
-                            "prd_id": row["prd_id"] or "",
-                            "plan_id": row["plan_id"] or "",
-                            "qa_id": row["qa_id"] or "",
-                        }],
-                    )
                 count += 1
         if count:
             self._conn.commit()

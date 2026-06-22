@@ -286,6 +286,7 @@ class TestSyncVectors:
     def test_sync_vectors_embeds_missing(self, tmp_path, mock_chromadb):
         from atlassian_cli.storage.memory_store import MemoryStore
         from atlassian_cli.models.memory import Memory, MemoryType
+        mock_collection, upserted_ids = mock_chromadb
         mock_ollama = MagicMock()
         mock_ollama.embed.return_value = [0.1] * 768
         store = MemoryStore(
@@ -299,8 +300,9 @@ class TestSyncVectors:
         store.add(Memory(id="MEM-002", content="second", type=MemoryType.note,
                          tags=[], created_at=now, updated_at=now))
 
-        store._collection.delete(ids=["MEM-002"])
-        assert store._collection.count() == 1
+        # Simulate MEM-001 already indexed, MEM-002 missing from vector index
+        upserted_ids.append("MEM-001")
+        mock_collection.count.return_value = 1
 
         count = store.sync_vectors()
         assert count == 1
@@ -309,6 +311,7 @@ class TestSyncVectors:
     def test_sync_vectors_returns_zero_when_all_synced(self, tmp_path, mock_chromadb):
         from atlassian_cli.storage.memory_store import MemoryStore
         from atlassian_cli.models.memory import Memory, MemoryType
+        mock_collection, upserted_ids = mock_chromadb
         mock_ollama = MagicMock()
         mock_ollama.embed.return_value = [0.1] * 768
         store = MemoryStore(
@@ -319,6 +322,10 @@ class TestSyncVectors:
         now = datetime.now(timezone.utc)
         store.add(Memory(id="MEM-001", content="synced", type=MemoryType.note,
                          tags=[], created_at=now, updated_at=now))
+
+        # Simulate MEM-001 already in the vector index
+        upserted_ids.append("MEM-001")
+        mock_collection.count.return_value = 1
 
         count = store.sync_vectors()
         assert count == 0

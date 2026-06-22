@@ -56,7 +56,7 @@ def add(
         id=store.next_id(),
         content=content,
         type=type,
-        tags=list(tag) if tag else [],
+        tags=[t for raw in (tag or []) for t in raw.split(",") if t],
         feature_id=feature,
         prd_id=prd,
         plan_id=plan,
