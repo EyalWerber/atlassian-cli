@@ -1,4 +1,5 @@
-from typing import Optional
+from datetime import datetime, timezone
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -251,3 +252,102 @@ def unlink(
         console.print(f"[red]✗[/red]  {e}")
         raise typer.Exit(1)
     console.print(f"[green]✓[/green] Removed: {key} no longer blocks {blocks}")
+
+
+def _adf_to_text(node: object) -> str:
+    """Recursively extract plain text from an Atlassian Document Format node."""
+    if not node or isinstance(node, str):
+        return node or ""
+    if not isinstance(node, dict):
+        return ""
+    if node.get("type") == "text":
+        return node.get("text", "")
+    parts = [_adf_to_text(child) for child in node.get("content", [])]
+    return " ".join(p for p in parts if p)
+
+
+@app.command("ingest")
+def ingest(
+    key: str = typer.Argument("", help="Issue key, e.g. SI-42 (omit with --all)"),
+    all_bugs: bool = typer.Option(False, "--all", help="Ingest all Bug issues in the project"),
+    force: bool = typer.Option(False, "--force", "-f", help="Re-ingest even if already saved"),
+) -> None:
+    """Read a Jira issue's comments into memory for bug pattern recognition."""
+    from atlassian_cli.integrations.ollama import OllamaClient
+    from atlassian_cli.models.memory import Memory, MemoryType
+    from atlassian_cli.storage.memory_store import MemoryStore
+
+    settings = get_settings()
+    jira = JiraClient(settings)
+
+    if all_bugs:
+        project = settings.jira_project
+        try:
+            issues = jira.search_issues(
+                f"project={project} AND issuetype=Bug ORDER BY created DESC",
+                fields=["summary"],
+            )
+        except RuntimeError as e:
+            console.print(f"[red]✗[/red]  {e}")
+            raise typer.Exit(1)
+        keys = [i["key"] for i in issues]
+        if not keys:
+            console.print("[yellow]No Bug issues found.[/yellow]")
+            return
+    elif key:
+        keys = [key]
+    else:
+        console.print("[red]✗[/red]  Provide an issue key or use --all")
+        raise typer.Exit(1)
+
+    ollama = OllamaClient(settings)
+    mem_store = MemoryStore(
+        db_path=settings.memory_db_path,
+        vector_path=settings.memory_vector_path,
+        ollama=ollama,
+        turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
+        turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
+    )
+
+    ingested = skipped = 0
+    for k in keys:
+        if not force:
+            existing = mem_store.list(tag=k, limit=1)
+            if existing:
+                skipped += 1
+                console.print(f"[dim]  {k}: already ingested (--force to overwrite)[/dim]")
+                continue
+
+        try:
+            issue = jira.get_issue(k)
+            comments = jira.get_comments(k)
+        except RuntimeError as e:
+            console.print(f"[red]✗[/red]  {k}: {e}")
+            continue
+
+        fields = issue["fields"]
+        title = fields.get("summary", "")
+        description = _adf_to_text(fields.get("description") or {})
+        comment_texts = [_adf_to_text(c.get("body") or {}) for c in comments]
+
+        try:
+            summary = ollama.summarize_issue(k, title, description, comment_texts)
+        except RuntimeError as e:
+            console.print(f"[yellow]⚠[/yellow]  {k}: Ollama unavailable — saving title only ({e})")
+            summary = f"{k}: {title}"
+
+        now = datetime.now(timezone.utc)
+        memory = Memory(
+            id=mem_store.next_id(),
+            content=summary,
+            type=MemoryType.bug,
+            tags=[k, "ingested"],
+            created_at=now,
+            updated_at=now,
+        )
+        mem_store.add(memory)
+        ingested += 1
+        console.print(f"[green]✓[/green] {k}: saved as {memory.id}")
+
+    if all_bugs or len(keys) > 1:
+        console.print(f"\n[bold]{ingested} ingested, {skipped} skipped[/bold]")

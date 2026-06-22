@@ -93,6 +93,13 @@ class JiraClient:
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
 
+    def get_comments(self, key: str) -> list[dict]:
+        try:
+            result = self._jira.get(f"rest/api/3/issue/{key}/comment")
+            return result.get("comments", [])
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
     def add_comment(self, key: str, body: str) -> None:
         try:
             self._jira.issue_add_comment(key, body)
@@ -113,8 +120,8 @@ class JiraClient:
         fields: dict = {
             "project": {"key": self.project},
             "summary": summary,
-            "description": _adf_paragraph(description),
-            "issuetype": {"name": "Epic"},
+            "description": description,
+            "issuetype": {"name": "Epic THPA"},
         }
         if parent_key:
             fields["parent"] = {"key": parent_key}
@@ -129,8 +136,8 @@ class JiraClient:
             issue = self._jira.create_issue(fields={
                 "project": {"key": self.project},
                 "summary": summary,
-                "description": _adf_paragraph(description),
-                "issuetype": {"name": "Story"},
+                "description": description,
+                "issuetype": {"name": "Story THPA"},
                 "parent": {"key": epic_key},
             })
             return issue["key"]
@@ -142,7 +149,7 @@ class JiraClient:
             issue = self._jira.create_issue(fields={
                 "project": {"key": self.project},
                 "summary": summary,
-                "description": _adf_paragraph(description),
+                "description": description,
                 "issuetype": {"name": "Task"},
                 "parent": {"key": parent_key},
             })

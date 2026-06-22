@@ -65,11 +65,51 @@ Rules:
 - Do not include code, selectors, or technical implementation details in steps"""
 
 
+_ISSUE_SUMMARY_SYSTEM = (
+    "You are summarizing a Jira issue into a compact memory entry for future bug recognition. "
+    "Write 2–4 sentences covering: the issue key and title, the problem observed, "
+    "root cause if identified, and fix/resolution if present in the comments. "
+    "Include searchable details like error messages, component names, or reproduction steps. "
+    "Output plain text only — no headings, no bullet points."
+)
+
+
 class OllamaClient:
     def __init__(self, settings: Settings):
         self.host = settings.ollama_host
         self.model = settings.ollama_model
         self.embed_model = settings.ollama_embed_model
+
+    def summarize_issue(self, key: str, title: str, description: str, comments: list[str]) -> str:
+        self.warmup()
+        comment_block = "\n".join(f"- {c}" for c in comments) if comments else "(no comments)"
+        user_content = (
+            f"Issue: {key}\nTitle: {title}\n"
+            f"Description:\n{description or '(no description)'}\n\n"
+            f"Comments:\n{comment_block}"
+        )
+        try:
+            response = requests.post(
+                f"{self.host}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": _ISSUE_SUMMARY_SYSTEM},
+                        {"role": "user", "content": user_content},
+                    ],
+                    "stream": False,
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+        except requests.exceptions.ConnectionError:
+            raise RuntimeError(f"Ollama not available at {self.host}. Is it running?")
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Ollama request failed: {e}")
+        try:
+            return response.json()["message"]["content"].strip()
+        except (KeyError, ValueError) as e:
+            raise RuntimeError(f"Ollama returned unexpected response format: {e}")
 
     def decompose_prd(self, prd: PRD) -> dict:
         self.warmup()
