@@ -105,6 +105,12 @@ atlassian plan list
 ### Issues
 
 ```bash
+# List issues (default: all in configured project)
+atlassian issue list
+atlassian issue list --status open          # not-Done issues
+atlassian issue list --status done
+atlassian issue list --jql "assignee = currentUser() ORDER BY updated DESC"
+
 # Show issue details and links
 atlassian issue show SI-42
 
