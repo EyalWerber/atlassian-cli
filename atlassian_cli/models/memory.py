@@ -9,6 +9,7 @@ class MemoryType(str, Enum):
     context = "context"
     note = "note"
     bug = "bug"
+    plan = "plan"
 
 
 class Memory(BaseModel):

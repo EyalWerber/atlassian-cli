@@ -180,6 +180,7 @@ def _build_claude_md(
     decisions: list[Memory],
     contexts: list[Memory],
     bugs: list[Memory],
+    plans: list[Memory],
 ) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     parts = [
@@ -187,6 +188,11 @@ def _build_claude_md(
         f"> Generated {now} · Regenerate: `atlassian memory snapshot`",
         "",
     ]
+    if plans:
+        parts.append("## Upcoming Work")
+        for m in plans:
+            parts.append(f"- [{m.id}] {m.content}")
+        parts.append("")
     if adrs:
         parts.append("## Architecture Decisions (ADRs)")
         for adr in adrs:
@@ -225,15 +231,17 @@ def snapshot() -> None:
     decisions: list[Memory] = []
     contexts: list[Memory] = []
     bugs: list[Memory] = []
+    plans: list[Memory] = []
     try:
         mem_store = _build_mem_store(settings)
         decisions = mem_store.list(type=MemoryType.decision, limit=50)
         contexts = mem_store.list(type=MemoryType.context, limit=50)
         bugs = mem_store.list(type=MemoryType.bug, limit=10)
+        plans = mem_store.list(type=MemoryType.plan, limit=20)
     except Exception:
         console.print("[dim]  (memory store unavailable — CLAUDE.md will contain ADRs only)[/dim]")
 
-    content = _build_claude_md(adrs, decisions, contexts, bugs)
+    content = _build_claude_md(adrs, decisions, contexts, bugs, plans)
     output.write_text(content, encoding="utf-8")
     console.print(f"[green]✓[/green] CLAUDE.md written  ({len(content.splitlines())} lines)")
 
