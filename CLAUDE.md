@@ -24,3 +24,19 @@ atlassian adr create / list
 - After every commit: `git push` immediately
 - Never call Python methods/Atlassian APIs directly — always use `atlassian <command>`
 - The skill `/atlassian-cli` has the full command reference
+
+## MCP Server
+
+`atlassian-mcp` starts automatically when Claude Code opens this project (configured in `.claude/settings.json`).
+
+Read-only tools (Claude calls freely, no permission prompt):
+- `search_memory(query, limit)` — semantic search across project memory
+- `list_memories(type, feature, limit)` — browse by type or feature ID
+- `get_issue(key)` — fetch a Jira issue
+- `list_issues(jql, status)` — query Jira issues
+
+Write tools (Claude asks permission per call):
+- `add_memory(content, type, tags, feature_id)`
+- `create_issue(summary, type, description, parent_key)`
+- `transition_issue(key, status)`
+- `add_comment(key, body)`
