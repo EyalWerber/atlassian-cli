@@ -270,6 +270,27 @@ class JiraClient:
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
 
+    def create_issue(
+        self,
+        summary: str,
+        description: str,
+        issue_type: str,
+        parent_key: Optional[str] = None,
+    ) -> str:
+        fields: dict = {
+            "project": {"key": self.project},
+            "summary": summary,
+            "description": description,
+            "issuetype": {"name": issue_type},
+        }
+        if parent_key:
+            fields["parent"] = {"key": parent_key}
+        try:
+            issue = self._jira.create_issue(fields=fields)
+            return issue["key"]
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
     def update_description(self, issue_key: str, description: str) -> None:
         try:
             self._jira.put(

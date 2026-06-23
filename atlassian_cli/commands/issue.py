@@ -254,6 +254,32 @@ def unlink(
     console.print(f"[green]✓[/green] Removed: {key} no longer blocks {blocks}")
 
 
+_ISSUE_TYPES = ["Feature", "Bug", "Task", "Story", "Epic", "Sub-task"]
+
+
+@app.command("create")
+def create(
+    summary: str = typer.Argument(..., help="Issue summary"),
+    type: str = typer.Option("Task", "--type", "-t", help=f"Issue type: {', '.join(_ISSUE_TYPES)}"),
+    description: str = typer.Option("", "--description", "-d", help="Issue description"),
+    parent: Optional[str] = typer.Option(None, "--parent", "-p", help="Parent issue key, e.g. ACLI-4"),
+) -> None:
+    """Create a Jira issue of any type."""
+    jira = JiraClient(get_settings())
+    try:
+        key = jira.create_issue(
+            summary=summary,
+            description=description,
+            issue_type=type,
+            parent_key=parent,
+        )
+    except RuntimeError as e:
+        console.print(f"[red]✗[/red]  {e}")
+        raise typer.Exit(1)
+    parent_info = f" under {parent}" if parent else ""
+    console.print(f"[green]✓[/green] {type} created  [{key}]{parent_info}")
+
+
 def _adf_to_text(node: object) -> str:
     """Recursively extract plain text from an Atlassian Document Format node."""
     if not node or isinstance(node, str):
