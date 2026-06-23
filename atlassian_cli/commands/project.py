@@ -568,16 +568,23 @@ def standardize(
     if not in_qa_in_ref:
         console.print(f"[yellow]⚠[/yellow]  '{reference}' has no 'IN QA' status — double-check the reference key.")
 
-    # ── find or create Feature issue type (green = Story avatar) ────────
+    # ── find or create Feature issue type (global scope only) ───────────
     all_types: list[dict] = _api_get(session, base, "/rest/api/3/issuetype")  # type: ignore[assignment]
-    feature_type = next((t for t in all_types if t["name"].lower() == "feature"), None)
+    # Prefer global-scoped Feature so it can be added to any project's scheme
+    feature_type = next(
+        (t for t in all_types
+         if t["name"].lower() == "feature" and not t.get("scope")),
+        None,
+    )
 
     if not feature_type:
-        # Borrow the Story type's avatarId for a green icon; fall back to 10315
-        story_type = next((t for t in all_types if t["name"].lower() == "story"), None)
+        story_type = next(
+            (t for t in all_types if t["name"].lower() == "story" and not t.get("scope")),
+            None,
+        )
         green_avatar = story_type.get("avatarId", 10315) if story_type else 10315
         if dry_run:
-            console.print("[yellow]Would create:[/yellow] 'Feature' issue type (avatarId from Story)")
+            console.print("[yellow]Would create:[/yellow] 'Feature' issue type (global, green icon)")
             feature_type = {"id": "__dry_run__", "name": "Feature"}
         else:
             try:
@@ -587,12 +594,12 @@ def standardize(
                     "type": "standard",
                     "avatarId": green_avatar,
                 })
-                console.print(f"[green]✓[/green] Created 'Feature' issue type [id={feature_type['id']}]")
+                console.print(f"[green]✓[/green] Created global 'Feature' issue type [id={feature_type['id']}]")
             except Exception as e:
                 console.print(f"[red]✗[/red]  Could not create Feature issue type: {e}")
                 raise typer.Exit(1)
     else:
-        console.print(f"[dim]'Feature' issue type already exists (id={feature_type['id']})[/dim]")
+        console.print(f"[dim]Global 'Feature' issue type found (id={feature_type['id']})[/dim]")
 
     # ── process each project ─────────────────────────────────────────────
     changed = 0
@@ -625,18 +632,22 @@ def standardize(
         if dry_run:
             continue
 
-        # ─ add Feature issue type to this project's scheme
+        # ─ add Feature issue type to this project's scheme (append only)
         if needs_feature:
             try:
                 scheme_resp = _api_get(session, base, "/rest/api/3/issuetypescheme/project", {"projectId": project["id"]})
                 scheme_entries = scheme_resp.get("values", [])
                 if scheme_entries:
                     scheme_id = scheme_entries[0]["issueTypeScheme"]["id"]
-                    _api_put(session, base, f"/rest/api/3/issuetypescheme/{scheme_id}/issuetype", {
-                        "issueTypeIds": [feature_type["id"]],
-                    })
-                    console.print(f"  [green]✓[/green] Added Feature to {pkey}")
-                    changed += 1
+                    existing_ids = {t["id"] for t in project.get("issueTypes", [])}
+                    if feature_type["id"] not in existing_ids:
+                        _api_put(session, base, f"/rest/api/3/issuetypescheme/{scheme_id}/issuetype", {
+                            "issueTypeIds": [feature_type["id"]],
+                        })
+                        console.print(f"  [green]✓[/green] Added Feature to {pkey}")
+                        changed += 1
+                    else:
+                        console.print(f"  [dim]Feature already in {pkey} scheme[/dim]")
                 else:
                     console.print(f"  [yellow]⚠[/yellow]  No issue type scheme found for {pkey}")
             except Exception as e:
