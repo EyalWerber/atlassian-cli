@@ -10,13 +10,42 @@ from rich.table import Table
 _GLOBAL_ENV = Path.home() / ".atlassian-cli" / ".env"
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=[str(_GLOBAL_ENV), ".env"],  # global fallback, local overrides
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-    )
+def _make_settings_class(env_dir: Path | None = None) -> type:
+    env_files: list[str] = [str(_GLOBAL_ENV)]
+    if env_dir is not None:
+        env_files.append(str(env_dir / ".env"))
+    else:
+        env_files.append(".env")
+
+    class _Settings(BaseSettings):
+        model_config = SettingsConfigDict(
+            env_file=env_files,
+            env_file_encoding="utf-8",
+            case_sensitive=False,
+            extra="ignore",
+        )
+
+        atlassian_url: str
+        atlassian_email: str
+        atlassian_api_token: SecretStr
+        jira_project: str
+        confluence_space: str
+
+        ollama_host: str = "http://localhost:11434"
+        ollama_model: str = "llama3.2"
+        memory_db_path: str = "~/.atlassian-cli/memory.db"
+        memory_vector_path: str = "~/.atlassian-cli/vectors/"
+        ollama_embed_model: str = "nomic-embed-text"
+        qa_base_url: str = ""
+        memory_backend: str = "local"
+        turso_url: Optional[str] = None
+        turso_auth_token: Optional[str] = None
+
+    return _Settings
+
+
+class Settings(_make_settings_class()):  # type: ignore[misc]
+    pass
 
     atlassian_url: str
     atlassian_email: str
@@ -35,9 +64,10 @@ class Settings(BaseSettings):
     turso_auth_token: Optional[str] = None
 
 
-def get_settings() -> Settings:
+def get_settings(env_dir: Path | None = None) -> Settings:
+    SettingsClass = _make_settings_class(env_dir)
     try:
-        return Settings()
+        return SettingsClass()
     except ValidationError as e:
         console = Console(force_terminal=True, legacy_windows=False)
         table = Table(title="[red]X Missing required configuration[/red]", show_header=True)

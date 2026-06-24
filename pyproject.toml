@@ -23,6 +23,7 @@ dev = ["pytest>=8", "pytest-mock>=3", "requests-mock>=1.12"]
 
 [project.scripts]
 atlassian = "atlassian_cli.main:app"
+atlassian-mcp = "atlassian_cli.mcp:main"
 
 [tool.pytest.ini_options]
 addopts = "-p no:logfire"

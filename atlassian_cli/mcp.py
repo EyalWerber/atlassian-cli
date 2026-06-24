@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -17,13 +18,34 @@ from atlassian_cli.storage.memory_store import MemoryStore
 
 server = Server("atlassian-cli")
 
+_project_dir: Path | None = None
+_roots_fetched: bool = False
+
+
+async def _resolve_project_dir() -> Path | None:
+    """Fetch workspace roots from the MCP client on first call and cache the result."""
+    global _project_dir, _roots_fetched
+    if _roots_fetched:
+        return _project_dir
+    _roots_fetched = True
+    try:
+        result = await server.request_context.session.list_roots()
+        if result.roots:
+            uri = str(result.roots[0].uri)
+            path = Path(uri.removeprefix("file:///").removeprefix("file://"))
+            if path.is_dir():
+                _project_dir = path
+    except Exception:
+        pass
+    return _project_dir
+
 
 def _get_jira() -> JiraClient:
-    return JiraClient(get_settings())
+    return JiraClient(get_settings(env_dir=_project_dir))
 
 
 def _get_store() -> MemoryStore:
-    s = get_settings()
+    s = get_settings(env_dir=_project_dir)
     return MemoryStore(
         db_path=s.memory_db_path,
         vector_path=s.memory_vector_path,
@@ -266,6 +288,7 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    await _resolve_project_dir()
     handler = _HANDLERS.get(name)
     if not handler:
         result: dict = {"error": f"Unknown tool: {name}"}

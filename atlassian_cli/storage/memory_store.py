@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -65,6 +66,9 @@ class MemoryStore:
             self._conn.commit()
 
     def _init_chroma(self) -> None:
+        if sys.platform == "win32":
+            self._collection = None
+            return
         try:
             import chromadb
             self._vector_path.mkdir(parents=True, exist_ok=True)
