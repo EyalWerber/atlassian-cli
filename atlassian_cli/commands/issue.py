@@ -191,18 +191,24 @@ def show(
 def update(
     key: str = typer.Argument(..., help="Issue key, e.g. SI-5"),
     description: Optional[str] = typer.Option(None, "--description", help="New description text"),
+    priority: Optional[str] = typer.Option(None, "--priority", "-P", help="Priority: Highest, High, Medium, Low, Lowest"),
 ) -> None:
     """Update fields on a Jira issue."""
-    if description is None:
-        console.print("[red]✗[/red]  Nothing to update. Use --description \"...\"")
+    if description is None and priority is None:
+        console.print("[red]✗[/red]  Nothing to update. Use --description or --priority")
         raise typer.Exit(1)
     jira = JiraClient(get_settings())
     try:
-        jira.update_description(key, description)
+        jira.update_issue(key, priority=priority, description=description)
     except RuntimeError as e:
         console.print(f"[red]✗[/red]  {e}")
         raise typer.Exit(1)
-    console.print(f"[green]✓[/green] {key} description updated")
+    updated = []
+    if description is not None:
+        updated.append("description")
+    if priority is not None:
+        updated.append(f"priority → {priority}")
+    console.print(f"[green]✓[/green] {key} updated: {', '.join(updated)}")
 
 
 @app.command("link")
@@ -263,6 +269,7 @@ def create(
     type: str = typer.Option("Task", "--type", "-t", help=f"Issue type: {', '.join(_ISSUE_TYPES)}"),
     description: str = typer.Option("", "--description", "-d", help="Issue description"),
     parent: Optional[str] = typer.Option(None, "--parent", "-p", help="Parent issue key, e.g. ACLI-4"),
+    priority: Optional[str] = typer.Option(None, "--priority", "-P", help="Priority: Highest, High, Medium, Low, Lowest"),
 ) -> None:
     """Create a Jira issue of any type."""
     jira = JiraClient(get_settings())
@@ -272,12 +279,14 @@ def create(
             description=description,
             issue_type=type,
             parent_key=parent,
+            priority=priority,
         )
     except RuntimeError as e:
         console.print(f"[red]✗[/red]  {e}")
         raise typer.Exit(1)
     parent_info = f" under {parent}" if parent else ""
-    console.print(f"[green]✓[/green] {type} created  [{key}]{parent_info}")
+    priority_info = f" [{priority}]" if priority else ""
+    console.print(f"[green]✓[/green] {type} created  [{key}]{parent_info}{priority_info}")
 
 
 def _adf_to_text(node: object) -> str:

@@ -142,14 +142,30 @@ def create_issue(
     type: str = "Task",
     description: str = "",
     parent_key: str | None = None,
+    priority: str | None = None,
 ) -> dict:
     key = _get_jira().create_issue(
         summary=summary,
         description=description,
         issue_type=type,
         parent_key=parent_key,
+        priority=priority,
     )
     return {"key": key}
+
+
+def update_issue(
+    key: str,
+    priority: str | None = None,
+    description: str | None = None,
+) -> dict:
+    _get_jira().update_issue(key, priority=priority, description=description)
+    updated = []
+    if priority is not None:
+        updated.append(f"priority={priority}")
+    if description is not None:
+        updated.append("description")
+    return {"key": key, "updated": updated}
 
 
 def transition_issue(key: str, status: str) -> dict:
@@ -239,8 +255,22 @@ _TOOLS: list[Tool] = [
                 "type": {"type": "string", "enum": ["Feature", "Bug", "Task", "Story", "Epic", "Sub-task"]},
                 "description": {"type": "string"},
                 "parent_key": {"type": "string", "description": "Parent issue key, e.g. ACLI-4"},
+                "priority": {"type": "string", "description": "Highest, High, Medium, Low, or Lowest"},
             },
             "required": ["summary"],
+        },
+    ),
+    Tool(
+        name="update_issue",
+        description="Update fields on an existing Jira issue.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Issue key, e.g. ACLI-4"},
+                "priority": {"type": "string", "description": "Highest, High, Medium, Low, or Lowest"},
+                "description": {"type": "string"},
+            },
+            "required": ["key"],
         },
     ),
     Tool(
@@ -275,7 +305,8 @@ _HANDLERS: dict = {
     "get_issue": lambda a: get_issue(a["key"]),
     "list_issues": lambda a: list_issues(a.get("jql"), a.get("status")),
     "add_memory": lambda a: add_memory(a["content"], a.get("type", "note"), a.get("tags"), a.get("feature_id")),
-    "create_issue": lambda a: create_issue(a["summary"], a.get("type", "Task"), a.get("description", ""), a.get("parent_key")),
+    "create_issue": lambda a: create_issue(a["summary"], a.get("type", "Task"), a.get("description", ""), a.get("parent_key"), a.get("priority")),
+    "update_issue": lambda a: update_issue(a["key"], a.get("priority"), a.get("description")),
     "transition_issue": lambda a: transition_issue(a["key"], a["status"]),
     "add_comment": lambda a: add_comment(a["key"], a["body"]),
 }

@@ -276,6 +276,7 @@ class JiraClient:
         description: str,
         issue_type: str,
         parent_key: Optional[str] = None,
+        priority: Optional[str] = None,
     ) -> str:
         fields: dict = {
             "project": {"key": self.project},
@@ -285,17 +286,34 @@ class JiraClient:
         }
         if parent_key:
             fields["parent"] = {"key": parent_key}
+        if priority:
+            fields["priority"] = {"name": priority}
         try:
             issue = self._jira.create_issue(fields=fields)
             return issue["key"]
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
 
-    def update_description(self, issue_key: str, description: str) -> None:
+    def update_issue(
+        self,
+        issue_key: str,
+        priority: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        update_fields: dict = {}
+        if priority is not None:
+            update_fields["priority"] = {"name": priority}
+        if description is not None:
+            update_fields["description"] = description
+        if not update_fields:
+            return
         try:
             self._jira.put(
                 f"rest/api/2/issue/{issue_key}",
-                data={"fields": {"description": description}},
+                data={"fields": update_fields},
             )
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
+
+    def update_description(self, issue_key: str, description: str) -> None:
+        self.update_issue(issue_key, description=description)
