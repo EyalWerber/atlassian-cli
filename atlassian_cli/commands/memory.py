@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -263,15 +264,16 @@ def status() -> None:
             pass
 
     vector_count = 0
-    vector_path = Path(settings.memory_vector_path).expanduser()
-    if vector_path.exists():
-        try:
-            import chromadb
-            client = chromadb.PersistentClient(path=str(vector_path))
-            col = client.get_or_create_collection("memories")
-            vector_count = col.count()
-        except Exception:
-            pass
+    if sys.platform != "win32":
+        vector_path = Path(settings.memory_vector_path).expanduser()
+        if vector_path.exists():
+            try:
+                import chromadb
+                client = chromadb.PersistentClient(path=str(vector_path))
+                col = client.get_or_create_collection("memories")
+                vector_count = col.count()
+            except Exception:
+                pass
 
     ollama_ok = OllamaClient(settings).ping()
     ollama_icon = "[green]✓[/green]" if ollama_ok else "[red]✗[/red]"
