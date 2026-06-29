@@ -15,7 +15,9 @@ from atlassian_cli.storage.local import LocalStorage
 # ──────────────────────────────────────────────
 
 class TestConfig:
-    def test_memory_backend_defaults_to_local(self, tmp_path, monkeypatch):
+    def test_memory_backend_required(self, tmp_path, monkeypatch):
+        """MEMORY_BACKEND must be explicitly set — no silent default."""
+        from pydantic import ValidationError
         monkeypatch.setenv("ATLASSIAN_URL", "https://x.atlassian.net")
         monkeypatch.setenv("ATLASSIAN_EMAIL", "a@b.com")
         monkeypatch.setenv("ATLASSIAN_API_TOKEN", "tok")
@@ -23,7 +25,29 @@ class TestConfig:
         monkeypatch.setenv("CONFLUENCE_SPACE", "DEV")
         monkeypatch.delenv("MEMORY_BACKEND", raising=False)
 
-        # Prevent both ~/.atlassian-cli/.env and local .env from leaking MEMORY_BACKEND=turso
+        # Prevent both ~/.atlassian-cli/.env and local .env from leaking MEMORY_BACKEND
+        import pathlib
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(pathlib.Path, "home", lambda: tmp_path)
+
+        import importlib
+        import atlassian_cli.config as config_module
+        importlib.reload(config_module)
+        from atlassian_cli.config import Settings
+        with pytest.raises(ValidationError, match="memory_backend"):
+            Settings()
+
+    def test_memory_backend_local(self, tmp_path, monkeypatch):
+        """MEMORY_BACKEND=local is accepted and turso fields remain None."""
+        monkeypatch.setenv("ATLASSIAN_URL", "https://x.atlassian.net")
+        monkeypatch.setenv("ATLASSIAN_EMAIL", "a@b.com")
+        monkeypatch.setenv("ATLASSIAN_API_TOKEN", "tok")
+        monkeypatch.setenv("JIRA_PROJECT", "TEST")
+        monkeypatch.setenv("CONFLUENCE_SPACE", "DEV")
+        monkeypatch.setenv("MEMORY_BACKEND", "local")
+        monkeypatch.delenv("TURSO_URL", raising=False)
+        monkeypatch.delenv("TURSO_AUTH_TOKEN", raising=False)
+
         import pathlib
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(pathlib.Path, "home", lambda: tmp_path)

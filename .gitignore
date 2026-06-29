@@ -7,3 +7,5 @@ build/
 .venv/
 venv/
 *.egg
+memory/*.db
+memory/vectors/

@@ -115,6 +115,24 @@ class MemoryStore:
                 (memory.id, memory.content),
             )
         self._conn.commit()
+        if self._collection is not None:
+            try:
+                vector = self._ollama.embed(memory.content)
+                self._collection.upsert(
+                    ids=[memory.id],
+                    embeddings=[vector],
+                    documents=[memory.content],
+                    metadatas=[{
+                        "type": memory.type.value,
+                        "tags": json.dumps(memory.tags),
+                        "feature_id": memory.feature_id or "",
+                        "prd_id": memory.prd_id or "",
+                        "plan_id": memory.plan_id or "",
+                        "qa_id": memory.qa_id or "",
+                    }],
+                )
+            except Exception:
+                pass  # Ollama unavailable — FTS still usable
         return memory
 
     def get(self, id: str) -> Optional[Memory]:
@@ -177,10 +195,11 @@ class MemoryStore:
         if not self._is_turso:
             self._conn.execute("DELETE FROM memories_fts WHERE id = ?", (id,))
         self._conn.commit()
-        try:
-            self._collection.delete(ids=[id])
-        except Exception:
-            pass
+        if self._collection is not None:
+            try:
+                self._collection.delete(ids=[id])
+            except Exception:
+                pass
         return True
 
     def push_to_turso(self, turso_url: str, turso_auth_token: str) -> int:

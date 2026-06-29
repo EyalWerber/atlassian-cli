@@ -29,6 +29,8 @@ atlassian adr create / list
 
 `atlassian-mcp` starts automatically when Claude Code opens this project (configured in `.claude/settings.json`).
 
+**Before using any MCP tool, check:** Does a `.env` exist in the current project directory with at least `ATLASSIAN_URL`, `ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN`, `JIRA_PROJECT`, and `CONFLUENCE_SPACE`? If not — or if any tool returns `"error": "Not configured"` — run `atlassian project init` immediately. The wizard will ask for credentials, Jira project, Confluence space, Ollama model, and whether to use local SQLite or Turso for memory storage.
+
 Read-only tools (Claude calls freely, no permission prompt):
 - `search_memory(query, limit)` — semantic search across project memory
 - `list_memories(type, feature, limit)` — browse by type or feature ID

@@ -36,6 +36,7 @@ class TestMemorySnapshot:
         mock_store.list.side_effect = mock_list
         monkeypatch.setattr("atlassian_cli.commands.memory.MemoryStore", lambda **kwargs: mock_store)
         mock_settings = MagicMock()
+        mock_settings.memory_backend = "local"
         monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
 
         runner = CliRunner()
@@ -68,6 +69,7 @@ class TestMemorySnapshot:
         mock_store.list.return_value = []
         monkeypatch.setattr("atlassian_cli.commands.memory.MemoryStore", lambda **kwargs: mock_store)
         mock_settings = MagicMock()
+        mock_settings.memory_backend = "local"
         monkeypatch.setattr("atlassian_cli.commands.memory.get_settings", lambda: mock_settings)
 
         runner = CliRunner()

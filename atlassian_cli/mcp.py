@@ -46,12 +46,22 @@ def _get_jira() -> JiraClient:
 
 def _get_store() -> MemoryStore:
     s = get_settings(env_dir=_project_dir)
+    backend = s.memory_backend
+    if backend not in ("local", "turso"):
+        raise RuntimeError(
+            f"MEMORY_BACKEND={backend!r} is not valid. Set it to 'local' or 'turso' in .env."
+        )
+    if backend == "turso" and not s.turso_url:
+        raise RuntimeError(
+            "MEMORY_BACKEND=turso requires TURSO_URL in .env. "
+            "Run 'atlassian project init' to reconfigure."
+        )
     return MemoryStore(
         db_path=s.memory_db_path,
         vector_path=s.memory_vector_path,
         ollama=OllamaClient(s),
-        turso_url=s.turso_url if s.memory_backend == "turso" else None,
-        turso_auth_token=s.turso_auth_token if s.memory_backend == "turso" else None,
+        turso_url=s.turso_url if backend == "turso" else None,
+        turso_auth_token=s.turso_auth_token if backend == "turso" else None,
     )
 
 
@@ -327,13 +337,45 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         try:
             result = handler(arguments)
         except SystemExit:
-            result = {"error": "Not configured — run 'atlassian project init' in your project directory"}
+            result = {
+                "error": "Not configured",
+                "action": "Run 'atlassian project init' in your project directory to create the required .env file with Atlassian credentials and memory backend settings.",
+            }
         except Exception as e:
             result = {"error": str(e)}
     return [TextContent(type="text", text=json.dumps(result))]
 
 
+def _check_startup_env() -> None:
+    """Warn on stderr if .env is missing or incomplete at server start."""
+    import sys
+
+    env_path = Path(".env")
+    if not env_path.exists():
+        print(
+            "[atlassian-mcp] No .env found in current directory — "
+            "run 'atlassian project init' to configure credentials.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return
+    text = env_path.read_text(encoding="utf-8")
+    required = [
+        "ATLASSIAN_URL", "ATLASSIAN_EMAIL", "ATLASSIAN_API_TOKEN",
+        "JIRA_PROJECT", "CONFLUENCE_SPACE", "MEMORY_BACKEND",
+    ]
+    missing = [k for k in required if k + "=" not in text]
+    if missing:
+        print(
+            f"[atlassian-mcp] .env is missing required fields: {', '.join(missing)} — "
+            "run 'atlassian project init' to reconfigure.",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 async def _async_main() -> None:
+    _check_startup_env()
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,

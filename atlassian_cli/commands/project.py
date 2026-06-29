@@ -145,14 +145,23 @@ def _write_env(values: dict, path: Path) -> None:
         f"ATLASSIAN_API_TOKEN={values['atlassian_api_token']}",
         f"JIRA_PROJECT={values['jira_project']}",
         f"CONFLUENCE_SPACE={values['confluence_space']}",
+        "",
+        "# --- AI (Ollama) ---",
         f"OLLAMA_HOST={values['ollama_host']}",
         f"OLLAMA_MODEL={values['ollama_model']}",
         f"OLLAMA_EMBED_MODEL={values['ollama_embed_model']}",
-        "MEMORY_DB_PATH=~/.atlassian-cli/memory.db",
-        "MEMORY_VECTOR_PATH=~/.atlassian-cli/vectors/",
+        "",
+        "# --- Memory (per-project) ---",
+        "MEMORY_DB_PATH=./memory/atlassian.db",
+        "MEMORY_VECTOR_PATH=./memory/vectors/",
         f"QA_BASE_URL={values.get('qa_base_url', '')}",
         f"MEMORY_BACKEND={values['memory_backend']}",
     ]
+    if values.get("turso_url") or values.get("turso_auth_token"):
+        lines += [
+            "",
+            "# --- Turso (shared memory across machines) ---",
+        ]
     if values.get("turso_url"):
         lines.append(f"TURSO_URL={values['turso_url']}")
     if values.get("turso_auth_token"):
@@ -275,6 +284,53 @@ def init() -> None:
                     console.print(f"[red]✗[/red] Failed to create project: {exc}")
                     raise typer.Exit(1)
             collected["jira_project"] = proj_key
+
+            # ── Ensure Bug issue type is in the new project's scheme ──────
+            with console.status("[bold green]Configuring mandatory issue types...[/bold green]"):
+                try:
+                    _base = collected["atlassian_url"].rstrip("/")
+                    _session = _make_api_session(
+                        _base, collected["atlassian_email"], collected["atlassian_api_token"]
+                    )
+                    _all_types: list[dict] = _session.get(
+                        f"{_base}/rest/api/3/issuetype"
+                    ).json()
+                    _proj_data = _session.get(
+                        f"{_base}/rest/api/3/project/{proj_key}"
+                    ).json()
+                    _proj_id = _proj_data.get("id", "")
+                    _existing_names = {t["name"].lower() for t in _proj_data.get("issueTypes", [])}
+                    _existing_ids = {t["id"] for t in _proj_data.get("issueTypes", [])}
+
+                    _to_add: list[str] = []
+                    _added_labels: list[str] = []
+                    for _type_name, _desc, _avatar in [
+                        ("Bug", "A defect or unexpected behaviour", 10303),
+                        ("Feature", "A new feature or product improvement", 10315),
+                    ]:
+                        if _type_name.lower() not in _existing_names:
+                            _gtype = next(
+                                (t for t in _all_types
+                                 if t["name"].lower() == _type_name.lower() and not t.get("scope")),
+                                None,
+                            )
+                            if not _gtype:
+                                _gtype = _session.post(
+                                    f"{_base}/rest/api/3/issuetype",
+                                    json={"name": _type_name, "description": _desc,
+                                          "type": "standard", "avatarId": _avatar},
+                                ).json()
+                            if _gtype.get("id") and _gtype["id"] not in _existing_ids:
+                                _to_add.append(_gtype["id"])
+                                _added_labels.append(_type_name)
+
+                    if _to_add:
+                        _add_issue_types_to_project(_session, _base, _proj_id, _to_add)
+                        console.print(f"[green]✓[/green] Added mandatory issue types: {', '.join(_added_labels)}")
+                    else:
+                        console.print(f"[dim]Bug and Feature types already present[/dim]")
+                except Exception as exc:
+                    console.print(f"[yellow]⚠[/yellow]  Could not configure issue types: {exc}")
         else:
             proj_key = typer.prompt("  Project key", default="MYAPP").upper()
             try:
@@ -458,6 +514,66 @@ def init() -> None:
 
 # ── helpers for standardize ───────────────────────────────────────────────────
 
+def _add_issue_types_to_project(
+    session: requests.Session,
+    base: str,
+    project_id: str,
+    type_ids: list[str],
+    label: str = "issue types",
+) -> bool:
+    """Add issue type IDs to a project's scheme. Returns True on success."""
+    try:
+        scheme_resp = _api_get(session, base, "/rest/api/3/issuetypescheme/project", {"projectId": project_id})
+        entries = scheme_resp.get("values", [])
+        if not entries:
+            console.print(f"  [yellow]⚠[/yellow]  No issue type scheme found for project {project_id}")
+            return False
+        scheme_id = entries[0]["issueTypeScheme"]["id"]
+        _api_put(session, base, f"/rest/api/3/issuetypescheme/{scheme_id}/issuetype", {
+            "issueTypeIds": type_ids,
+        })
+        return True
+    except Exception as e:
+        console.print(f"  [red]✗[/red]  Could not add {label}: {e}")
+        return False
+
+
+def _find_or_create_issue_type(
+    session: requests.Session,
+    base: str,
+    all_types: list[dict],
+    name: str,
+    description: str,
+    avatar_fallback: int,
+    dry_run: bool,
+) -> dict | None:
+    """Return an existing global issue type by name or create it. Returns None on failure."""
+    existing = next(
+        (t for t in all_types if t["name"].lower() == name.lower() and not t.get("scope")),
+        None,
+    )
+    if existing:
+        console.print(f"[dim]Global '{name}' issue type found (id={existing['id']})[/dim]")
+        return existing
+
+    if dry_run:
+        console.print(f"[yellow]Would create:[/yellow] '{name}' issue type (global)")
+        return {"id": "__dry_run__", "name": name}
+
+    try:
+        created = _api_post(session, base, "/rest/api/3/issuetype", {
+            "name": name,
+            "description": description,
+            "type": "standard",
+            "avatarId": avatar_fallback,
+        })
+        console.print(f"[green]✓[/green] Created global '{name}' issue type [id={created['id']}]")
+        return created
+    except Exception as e:
+        console.print(f"[red]✗[/red]  Could not create '{name}' issue type: {e}")
+        return None
+
+
 def _make_api_session(url: str, email: str, token: str) -> requests.Session:
     auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
     s = requests.Session()
@@ -568,38 +684,34 @@ def standardize(
     if not in_qa_in_ref:
         console.print(f"[yellow]⚠[/yellow]  '{reference}' has no 'IN QA' status — double-check the reference key.")
 
-    # ── find or create Feature issue type (global scope only) ───────────
+    # ── find or create required global issue types ───────────────────────
     all_types: list[dict] = _api_get(session, base, "/rest/api/3/issuetype")  # type: ignore[assignment]
-    # Prefer global-scoped Feature so it can be added to any project's scheme
-    feature_type = next(
-        (t for t in all_types
-         if t["name"].lower() == "feature" and not t.get("scope")),
-        None,
-    )
 
+    story_type = next(
+        (t for t in all_types if t["name"].lower() == "story" and not t.get("scope")), None
+    )
+    green_avatar = story_type.get("avatarId", 10315) if story_type else 10315
+    red_avatar = 10303  # standard Jira bug icon avatar ID
+
+    feature_type = _find_or_create_issue_type(
+        session, base, all_types,
+        name="Feature",
+        description="A new feature or product improvement",
+        avatar_fallback=green_avatar,
+        dry_run=dry_run,
+    )
     if not feature_type:
-        story_type = next(
-            (t for t in all_types if t["name"].lower() == "story" and not t.get("scope")),
-            None,
-        )
-        green_avatar = story_type.get("avatarId", 10315) if story_type else 10315
-        if dry_run:
-            console.print("[yellow]Would create:[/yellow] 'Feature' issue type (global, green icon)")
-            feature_type = {"id": "__dry_run__", "name": "Feature"}
-        else:
-            try:
-                feature_type = _api_post(session, base, "/rest/api/3/issuetype", {
-                    "name": "Feature",
-                    "description": "A new feature or product improvement",
-                    "type": "standard",
-                    "avatarId": green_avatar,
-                })
-                console.print(f"[green]✓[/green] Created global 'Feature' issue type [id={feature_type['id']}]")
-            except Exception as e:
-                console.print(f"[red]✗[/red]  Could not create Feature issue type: {e}")
-                raise typer.Exit(1)
-    else:
-        console.print(f"[dim]Global 'Feature' issue type found (id={feature_type['id']})[/dim]")
+        raise typer.Exit(1)
+
+    bug_type = _find_or_create_issue_type(
+        session, base, all_types,
+        name="Bug",
+        description="A defect or unexpected behaviour",
+        avatar_fallback=red_avatar,
+        dry_run=dry_run,
+    )
+    if not bug_type:
+        raise typer.Exit(1)
 
     # ── process each project ─────────────────────────────────────────────
     changed = 0
@@ -612,12 +724,14 @@ def standardize(
         pstyle = project.get("style", "classic")
         pname = project["name"]
         existing_type_names = {t["name"].lower() for t in project.get("issueTypes", [])}
+        existing_ids = {t["id"] for t in project.get("issueTypes", [])}
         needs_feature = "feature" not in existing_type_names
+        needs_bug = "bug" not in existing_type_names
 
         statuses = _project_statuses(session, base, pkey)
         needs_workflow = not any("IN QA" in s.upper() for s in statuses)
 
-        if not needs_feature and not needs_workflow:
+        if not needs_feature and not needs_bug and not needs_workflow:
             console.print(f"[dim]{pkey:12} ✓  already standardized[/dim]")
             skipped += 1
             continue
@@ -625,6 +739,8 @@ def standardize(
         parts = []
         if needs_feature:
             parts.append("Feature type")
+        if needs_bug:
+            parts.append("Bug type")
         if needs_workflow:
             parts.append("IN QA workflow")
         console.print(f"[yellow]{pkey:12}[/yellow]  needs: {', '.join(parts)}")
@@ -632,26 +748,24 @@ def standardize(
         if dry_run:
             continue
 
-        # ─ add Feature issue type to this project's scheme (append only)
-        if needs_feature:
-            try:
-                scheme_resp = _api_get(session, base, "/rest/api/3/issuetypescheme/project", {"projectId": project["id"]})
-                scheme_entries = scheme_resp.get("values", [])
-                if scheme_entries:
-                    scheme_id = scheme_entries[0]["issueTypeScheme"]["id"]
-                    existing_ids = {t["id"] for t in project.get("issueTypes", [])}
-                    if feature_type["id"] not in existing_ids:
-                        _api_put(session, base, f"/rest/api/3/issuetypescheme/{scheme_id}/issuetype", {
-                            "issueTypeIds": [feature_type["id"]],
-                        })
-                        console.print(f"  [green]✓[/green] Added Feature to {pkey}")
-                        changed += 1
-                    else:
-                        console.print(f"  [dim]Feature already in {pkey} scheme[/dim]")
-                else:
-                    console.print(f"  [yellow]⚠[/yellow]  No issue type scheme found for {pkey}")
-            except Exception as e:
-                console.print(f"  [red]✗[/red]  Feature type: {e}")
+        # ─ add missing issue types to this project's scheme (append only)
+        types_to_add = []
+        if needs_feature and feature_type["id"] not in existing_ids:
+            types_to_add.append(feature_type["id"])
+        if needs_bug and bug_type["id"] not in existing_ids:
+            types_to_add.append(bug_type["id"])
+
+        if types_to_add:
+            added_labels = []
+            if needs_feature and feature_type["id"] in types_to_add:
+                added_labels.append("Feature")
+            if needs_bug and bug_type["id"] in types_to_add:
+                added_labels.append("Bug")
+            if _add_issue_types_to_project(session, base, project["id"], types_to_add, ", ".join(added_labels)):
+                console.print(f"  [green]✓[/green] Added {', '.join(added_labels)} to {pkey}")
+                changed += 1
+            else:
+                console.print(f"  [dim]{pkey} — issue types already in scheme[/dim]")
 
         # ─ apply reference workflow scheme (classic projects only)
         if needs_workflow:

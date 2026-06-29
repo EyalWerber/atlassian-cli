@@ -23,12 +23,25 @@ console = Console()
 
 
 def _build_mem_store(settings) -> MemoryStore:
+    backend = settings.memory_backend
+    if backend not in ("local", "turso"):
+        console.print(
+            f"[red]✗[/red]  MEMORY_BACKEND={backend!r} is not valid. "
+            "Set it to [bold]local[/bold] or [bold]turso[/bold] in .env."
+        )
+        raise typer.Exit(1)
+    if backend == "turso" and not settings.turso_url:
+        console.print(
+            "[red]✗[/red]  MEMORY_BACKEND=turso requires TURSO_URL in .env.\n"
+            "  Run [bold]atlassian project init[/bold] to reconfigure."
+        )
+        raise typer.Exit(1)
     return MemoryStore(
         db_path=settings.memory_db_path,
         vector_path=settings.memory_vector_path,
         ollama=OllamaClient(settings),
-        turso_url=settings.turso_url if settings.memory_backend == "turso" else None,
-        turso_auth_token=settings.turso_auth_token if settings.memory_backend == "turso" else None,
+        turso_url=settings.turso_url if backend == "turso" else None,
+        turso_auth_token=settings.turso_auth_token if backend == "turso" else None,
     )
 
 

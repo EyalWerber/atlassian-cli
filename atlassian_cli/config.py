@@ -33,11 +33,11 @@ def _make_settings_class(env_dir: Path | None = None) -> type:
 
         ollama_host: str = "http://localhost:11434"
         ollama_model: str = "llama3.2"
-        memory_db_path: str = "~/.atlassian-cli/memory.db"
-        memory_vector_path: str = "~/.atlassian-cli/vectors/"
+        memory_db_path: str = "memory/atlassian.db"
+        memory_vector_path: str = "memory/vectors/"
         ollama_embed_model: str = "nomic-embed-text"
         qa_base_url: str = ""
-        memory_backend: str = "local"
+        memory_backend: str  # required — must be "local" or "turso" in .env
         turso_url: Optional[str] = None
         turso_auth_token: Optional[str] = None
 
@@ -59,7 +59,7 @@ class Settings(_make_settings_class()):  # type: ignore[misc]
     memory_vector_path: str = "~/.atlassian-cli/vectors/"
     ollama_embed_model: str = "nomic-embed-text"
     qa_base_url: str = ""
-    memory_backend: str = "local"
+    memory_backend: str  # required — must be "local" or "turso" in .env
     turso_url: Optional[str] = None
     turso_auth_token: Optional[str] = None
 
@@ -80,5 +80,5 @@ def get_settings(env_dir: Path | None = None) -> Settings:
                 table.add_row(var_name, "not set")
 
         console.print(table)
-        console.print("\nRun: [bold]cp .env.example .env[/bold]  and fill in the values.")
+        console.print("\nRun: [bold]atlassian project init[/bold] to create your .env file.")
         raise typer.Exit(1)
