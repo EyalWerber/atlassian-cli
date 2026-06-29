@@ -188,6 +188,27 @@ class MemoryStore:
             return [self._row_to_memory(r) for r in rows]
         return self.list(limit=limit, feature_id=feature_id)
 
+    def update(self, id: str, content: str) -> bool:
+        """Replace the content of an existing memory. Updates FTS and vector index."""
+        from datetime import timezone
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = self._conn.execute(
+            "UPDATE memories SET content = ?, updated_at = ? WHERE id = ?",
+            (content, now, id),
+        )
+        if cursor.rowcount == 0:
+            return False
+        if not self._is_turso:
+            self._conn.execute("UPDATE memories_fts SET content = ? WHERE id = ?", (content, id))
+        self._conn.commit()
+        if self._collection is not None:
+            try:
+                vector = self._ollama.embed(content)
+                self._collection.upsert(ids=[id], embeddings=[vector], documents=[content])
+            except Exception:
+                pass
+        return True
+
     def delete(self, id: str) -> bool:
         if not self._conn.execute("SELECT id FROM memories WHERE id = ?", (id,)).fetchone():
             return False

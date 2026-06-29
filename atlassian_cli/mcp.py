@@ -188,6 +188,56 @@ def add_comment(key: str, body: str) -> dict:
     return {"key": key}
 
 
+def resolve_bug(
+    key: str,
+    solution: str,
+    bug_memory_id: str | None = None,
+) -> dict:
+    """Transition a bug to Done, create a solution memory, and cross-link the original bug memory."""
+    jira = _get_jira()
+    store = _get_store()
+    now = datetime.now(timezone.utc)
+
+    # 1. Transition the issue to Done
+    jira.transition_issue(key, "Done")
+
+    # 2. Create solution memory tagged with the issue key
+    solution_mem = Memory(
+        id=store.next_id(),
+        content=f"Solution [{key}]: {solution}",
+        type=MemoryType("bug"),
+        tags=[key, "solution"],
+        feature_id=None,
+        created_at=now,
+        updated_at=now,
+    )
+    store.add(solution_mem)
+
+    # 3. Find the original bug memory and append a back-reference
+    linked_id: str | None = None
+    if bug_memory_id:
+        target = store.get(bug_memory_id)
+    else:
+        # Search memories tagged with this issue key, excluding solution memories
+        candidates = [
+            m for m in store.list(tag=key, limit=20)
+            if "solution" not in m.tags and m.id != solution_mem.id
+        ]
+        target = candidates[0] if candidates else None
+
+    if target:
+        updated_content = target.content.rstrip() + f"\n\n→ Solution: [{solution_mem.id}]"
+        store.update(target.id, updated_content)
+        linked_id = target.id
+
+    return {
+        "key": key,
+        "status": "Done",
+        "solution_memory": solution_mem.id,
+        "updated_bug_memory": linked_id,
+    }
+
+
 # ── MCP tool definitions ────────────────────────────────────────────────────
 
 _TOOLS: list[Tool] = [
@@ -307,6 +357,31 @@ _TOOLS: list[Tool] = [
             "required": ["key", "body"],
         },
     ),
+    Tool(
+        name="resolve_bug",
+        description=(
+            "Mark a bug as Done, save a solution memory, and cross-link it to the original bug memory. "
+            "Use this instead of transition_issue when closing a bug so the fix is documented. "
+            "Creates a new memory (type=bug, tags=[key, 'solution']) and appends '→ Solution: [MEM-XXX]' "
+            "to any existing bug memory tagged with the same issue key."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Jira issue key, e.g. TC-11"},
+                "solution": {
+                    "type": "string",
+                    "description": "How the bug was fixed — root cause, files changed, and what the fix does.",
+                },
+                "bug_memory_id": {
+                    "type": "string",
+                    "description": "Optional. MEM-XXX ID of the existing bug memory to cross-link. "
+                                   "If omitted, the tool searches for a memory tagged with the issue key.",
+                },
+            },
+            "required": ["key", "solution"],
+        },
+    ),
 ]
 
 _HANDLERS: dict = {
@@ -319,6 +394,7 @@ _HANDLERS: dict = {
     "update_issue": lambda a: update_issue(a["key"], a.get("priority"), a.get("description")),
     "transition_issue": lambda a: transition_issue(a["key"], a["status"]),
     "add_comment": lambda a: add_comment(a["key"], a["body"]),
+    "resolve_bug": lambda a: resolve_bug(a["key"], a["solution"], a.get("bug_memory_id")),
 }
 
 
