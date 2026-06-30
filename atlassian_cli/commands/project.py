@@ -517,7 +517,8 @@ def init() -> None:
     )
 
     # ── Workflow note ────────────────────────────────────────────────────
-    wf_admin_url = f"{collected['atlassian_url'].rstrip('/')}/secure/admin/workflows/ListWorkflows.jspa"
+    _base_url = collected['atlassian_url'].rstrip('/')
+    wf_admin_url = f"{_base_url}/secure/admin/workflows/ListWorkflows.jspa"
     console.print(Panel(
         f"[bold]Add 'In QA' to your workflow[/bold] (manual step — Jira REST API does not support this for classic projects):\n\n"
         f"  1. Open: [link={wf_admin_url}]{wf_admin_url}[/link]\n"
@@ -529,6 +530,18 @@ def init() -> None:
         f"       In QA → In Progress   (name: Fail QA)\n"
         f"  5. Publish the workflow",
         title="[yellow]⚠  Workflow Setup[/yellow]",
+        border_style="yellow",
+    ))
+
+    # ── Hierarchy note ────────────────────────────────────────────────────
+    hierarchy_url = f"{_base_url}/secure/admin/issue-hierarchy/"
+    console.print(Panel(
+        f"[bold]Elevate Feature above Story[/bold] (manual step — Jira REST API silently ignores hierarchyLevel changes):\n\n"
+        f"  1. Open: [link={hierarchy_url}]{hierarchy_url}[/link]\n"
+        f"  2. Find [bold]Feature[/bold] in the list\n"
+        f"  3. Set its level to [bold]1[/bold] (same as Epic, or add a new level between Epic and Story)\n"
+        f"  4. Save — Feature can then be used as parent of Story",
+        title="[yellow]⚠  Hierarchy Setup[/yellow]",
         border_style="yellow",
     ))
 
@@ -853,3 +866,18 @@ def standardize(
             f"  For each workflow: Edit → Add Status 'In QA' (category: In Progress)\n"
             f"  Transitions: In Progress→In QA (Send to QA), In QA→Done (Pass QA), In QA→In Progress (Fail QA)"
         )
+
+    # ── Hierarchy note ───────────────────────────────────────────────────
+    feature_type_result = next((t for t in _api_get(session, base, "/rest/api/3/issuetype")  # type: ignore[call-overload]
+                                if t.get("name") == "Feature" and not t.get("scope")), None)
+    if feature_type_result and feature_type_result.get("hierarchyLevel", 0) < 1:
+        hierarchy_url = f"{base}/secure/admin/issue-hierarchy/"
+        console.print(Panel(
+            f"[bold]Elevate Feature above Story[/bold] (manual step — Jira REST API silently ignores hierarchyLevel changes):\n\n"
+            f"  1. Open: [link={hierarchy_url}]{hierarchy_url}[/link]\n"
+            f"  2. Find [bold]Feature[/bold] in the list\n"
+            f"  3. Drag it above [bold]Story[/bold] / set its level to [bold]1[/bold] (same as Epic or a new level between Epic and Story)\n"
+            f"  4. Save — Feature can then be set as parent of Story in issue create commands",
+            title="[yellow]⚠  Hierarchy Setup[/yellow]",
+            border_style="yellow",
+        ))
