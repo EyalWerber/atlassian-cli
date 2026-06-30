@@ -304,9 +304,14 @@ def init() -> None:
 
                     _to_add: list[str] = []
                     _added_labels: list[str] = []
-                    for _type_name, _desc, _avatar in [
-                        ("Bug", "A defect or unexpected behaviour", 10303),
-                        ("Feature", "A new feature or product improvement", 10315),
+                    # Full hierarchy: Epic → Feature → Story → Task/Sub-task → Bug
+                    for _type_name, _desc, _avatar, _itype in [
+                        ("Epic",     "A large body of work that can be broken down", 10307, "standard"),
+                        ("Feature",  "A new feature or product improvement",          10322, "standard"),
+                        ("Story",    "A user story",                                  10315, "standard"),
+                        ("Task",     "A small, concrete unit of work",                10318, "standard"),
+                        ("Sub-task", "A subtask within a task or story",              10316, "subtask"),
+                        ("Bug",      "A defect or unexpected behaviour",              10303, "standard"),
                     ]:
                         if _type_name.lower() not in _existing_names:
                             _gtype = next(
@@ -318,7 +323,7 @@ def init() -> None:
                                 _gtype = _session.post(
                                     f"{_base}/rest/api/3/issuetype",
                                     json={"name": _type_name, "description": _desc,
-                                          "type": "standard", "avatarId": _avatar},
+                                          "type": _itype, "avatarId": _avatar},
                                 ).json()
                             if _gtype.get("id") and _gtype["id"] not in _existing_ids:
                                 _to_add.append(_gtype["id"])
@@ -326,9 +331,9 @@ def init() -> None:
 
                     if _to_add:
                         _add_issue_types_to_project(_session, _base, _proj_id, _to_add)
-                        console.print(f"[green]✓[/green] Added mandatory issue types: {', '.join(_added_labels)}")
+                        console.print(f"[green]✓[/green] Added issue types: {', '.join(_added_labels)}")
                     else:
-                        console.print(f"[dim]Bug and Feature types already present[/dim]")
+                        console.print(f"[dim]All issue types already present[/dim]")
                 except Exception as exc:
                     console.print(f"[yellow]⚠[/yellow]  Could not configure issue types: {exc}")
         else:
@@ -511,6 +516,22 @@ def init() -> None:
         f"\n[green]Done![/green] Run [bold]atlassian feature create[/bold] to get started."
     )
 
+    # ── Workflow note ────────────────────────────────────────────────────
+    wf_admin_url = f"{collected['atlassian_url'].rstrip('/')}/secure/admin/workflows/ListWorkflows.jspa"
+    console.print(Panel(
+        f"[bold]Add 'In QA' to your workflow[/bold] (manual step — Jira REST API does not support this for classic projects):\n\n"
+        f"  1. Open: [link={wf_admin_url}]{wf_admin_url}[/link]\n"
+        f"  2. Find your project's workflow → click [bold]Edit[/bold]\n"
+        f"  3. Click [bold]Add Status[/bold] → name: [bold]In QA[/bold], category: [bold]In Progress[/bold]\n"
+        f"  4. Add transitions:\n"
+        f"       In Progress → In QA   (name: Send to QA)\n"
+        f"       In QA → Done           (name: Pass QA)\n"
+        f"       In QA → In Progress   (name: Fail QA)\n"
+        f"  5. Publish the workflow",
+        title="[yellow]⚠  Workflow Setup[/yellow]",
+        border_style="yellow",
+    ))
+
 
 # ── helpers for standardize ───────────────────────────────────────────────────
 
@@ -547,13 +568,24 @@ def _find_or_create_issue_type(
     avatar_fallback: int,
     dry_run: bool,
 ) -> dict | None:
-    """Return an existing global issue type by name or create it. Returns None on failure."""
+    """Return an existing global issue type by name or create it. Updates avatar if it differs. Returns None on failure."""
     existing = next(
         (t for t in all_types if t["name"].lower() == name.lower() and not t.get("scope")),
         None,
     )
     if existing:
         console.print(f"[dim]Global '{name}' issue type found (id={existing['id']})[/dim]")
+        if existing.get("avatarId") != avatar_fallback:
+            if dry_run:
+                console.print(f"[yellow]Would update:[/yellow] '{name}' avatar → {avatar_fallback}")
+            else:
+                try:
+                    updated = _api_put(session, base, f"/rest/api/3/issuetype/{existing['id']}",
+                                       {"avatarId": avatar_fallback})
+                    console.print(f"[green]✓[/green] Updated '{name}' avatar to {avatar_fallback}")
+                    return {**existing, **(updated or {})}
+                except Exception as e:
+                    console.print(f"[yellow]⚠[/yellow]  Could not update '{name}' avatar: {e}")
         return existing
 
     if dry_run:
@@ -630,10 +662,10 @@ def _all_projects(session: requests.Session, base: str) -> list[dict]:
 
 @app.command("standardize")
 def standardize(
-    reference: str = typer.Option("PYTHAGO", "--reference", "-r", help="Project key to copy workflow from"),
+    reference: str = typer.Option("PY", "--reference", "-r", help="Project key to copy workflow from"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview changes without applying them"),
 ) -> None:
-    """Apply Feature issue type (green) and reference-project workflow to every project missing them."""
+    """Apply Feature + Story issue types and reference-project workflow to every project missing them."""
     from atlassian_cli.config import get_settings
     settings = get_settings()
 
@@ -687,17 +719,25 @@ def standardize(
     # ── find or create required global issue types ───────────────────────
     all_types: list[dict] = _api_get(session, base, "/rest/api/3/issuetype")  # type: ignore[assignment]
 
-    story_type = next(
-        (t for t in all_types if t["name"].lower() == "story" and not t.get("scope")), None
+    red_avatar = 10303     # standard Jira bug icon avatar ID
+    story_avatar = 10315   # lighter green bookmark — Jira's built-in Story icon
+    feature_avatar = 10322  # money/coin icon — the established Feature icon for this org
+
+    story_type = _find_or_create_issue_type(
+        session, base, all_types,
+        name="Story",
+        description="A user story",
+        avatar_fallback=story_avatar,
+        dry_run=dry_run,
     )
-    green_avatar = story_type.get("avatarId", 10315) if story_type else 10315
-    red_avatar = 10303  # standard Jira bug icon avatar ID
+    if not story_type:
+        raise typer.Exit(1)
 
     feature_type = _find_or_create_issue_type(
         session, base, all_types,
         name="Feature",
         description="A new feature or product improvement",
-        avatar_fallback=green_avatar,
+        avatar_fallback=feature_avatar,
         dry_run=dry_run,
     )
     if not feature_type:
@@ -725,18 +765,21 @@ def standardize(
         pname = project["name"]
         existing_type_names = {t["name"].lower() for t in project.get("issueTypes", [])}
         existing_ids = {t["id"] for t in project.get("issueTypes", [])}
+        needs_story = "story" not in existing_type_names
         needs_feature = "feature" not in existing_type_names
         needs_bug = "bug" not in existing_type_names
 
         statuses = _project_statuses(session, base, pkey)
         needs_workflow = not any("IN QA" in s.upper() for s in statuses)
 
-        if not needs_feature and not needs_bug and not needs_workflow:
+        if not needs_story and not needs_feature and not needs_bug and not needs_workflow:
             console.print(f"[dim]{pkey:12} ✓  already standardized[/dim]")
             skipped += 1
             continue
 
         parts = []
+        if needs_story:
+            parts.append("Story type")
         if needs_feature:
             parts.append("Feature type")
         if needs_bug:
@@ -750,6 +793,8 @@ def standardize(
 
         # ─ add missing issue types to this project's scheme (append only)
         types_to_add = []
+        if needs_story and story_type["id"] not in existing_ids:
+            types_to_add.append(story_type["id"])
         if needs_feature and feature_type["id"] not in existing_ids:
             types_to_add.append(feature_type["id"])
         if needs_bug and bug_type["id"] not in existing_ids:
@@ -757,6 +802,8 @@ def standardize(
 
         if types_to_add:
             added_labels = []
+            if needs_story and story_type["id"] in types_to_add:
+                added_labels.append("Story")
             if needs_feature and feature_type["id"] in types_to_add:
                 added_labels.append("Feature")
             if needs_bug and bug_type["id"] in types_to_add:
@@ -771,16 +818,38 @@ def standardize(
         if needs_workflow:
             if pstyle != "classic":
                 console.print(f"  [dim]Workflow skipped — {pkey} is team-managed (next-gen); change workflow in the board settings[/dim]")
-            elif not ref_wf_scheme_id:
-                console.print(f"  [yellow]⚠[/yellow]  Workflow skipped — could not read {reference}'s scheme")
-            else:
+            elif ref_wf_scheme_id and in_qa_in_ref:
                 try:
-                    _api_put(session, base, f"/rest/api/3/workflowscheme/{ref_wf_scheme_id}/project", {
-                        "projectId": project["id"],
-                    })
+                    r = session.put(f"{base}/rest/api/3/workflowscheme/{ref_wf_scheme_id}/project",
+                                    json={"projectId": project["id"]})
+                    if r.status_code == 404:
+                        raise RuntimeError("endpoint-not-available")
+                    r.raise_for_status()
                     console.print(f"  [green]✓[/green] Applied {reference} workflow to {pkey}")
                     changed += 1
-                except Exception as e:
-                    console.print(f"  [red]✗[/red]  Workflow: {e}")
+                except Exception:
+                    # Jira Cloud does not expose this endpoint — fall through to manual step
+                    wf_admin_url = f"{base}/secure/admin/workflows/ListWorkflows.jspa"
+                    console.print(f"  [yellow]⚠[/yellow]  Workflow must be updated manually (Jira Cloud REST API limitation).")
+                    console.print(f"  [dim]→ {wf_admin_url}[/dim]")
+            else:
+                # Reference project missing In QA — show manual steps
+                wf_admin_url = f"{base}/secure/admin/workflows/ListWorkflows.jspa"
+                console.print(f"  [yellow]⚠[/yellow]  IN QA status must be added manually.")
+                console.print(f"  [dim]→ {wf_admin_url}[/dim]")
 
     console.print(f"\n[bold]Done.[/bold] {changed} change(s) applied, {skipped} already compliant.")
+    if any(
+        _project_statuses(session, base, p["key"]) and
+        not any("IN QA" in s.upper() for s in _project_statuses(session, base, p["key"]))
+        and p.get("style") == "classic"
+        for p in all_projects if p["key"] != reference
+    ):
+        wf_admin_url = f"{base}/secure/admin/workflows/ListWorkflows.jspa"
+        console.print(
+            f"\n[bold cyan]Manual step required:[/bold cyan] "
+            f"Classic project workflows need 'In QA' added via the Jira Admin UI.\n"
+            f"  [link={wf_admin_url}]{wf_admin_url}[/link]\n"
+            f"  For each workflow: Edit → Add Status 'In QA' (category: In Progress)\n"
+            f"  Transitions: In Progress→In QA (Send to QA), In QA→Done (Pass QA), In QA→In Progress (Fail QA)"
+        )
