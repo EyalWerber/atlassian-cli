@@ -287,6 +287,14 @@ def create(
     parent_info = f" under {parent}" if parent else ""
     priority_info = f" [{priority}]" if priority else ""
     console.print(f"[green]✓[/green] {type} created  [{key}]{parent_info}{priority_info}")
+    if parent and type.lower() in ("story", "bug", "task"):
+        # Check if parent was a Feature (link was added automatically)
+        try:
+            parent_data = jira._jira.issue(parent, fields="issuetype")
+            if parent_data["fields"]["issuetype"]["name"].lower() == "feature":
+                console.print(f"[dim]  ↳ linked [{key}] implements [{parent}][/dim]")
+        except Exception:
+            pass
 
 
 def _adf_to_text(node: object) -> str:

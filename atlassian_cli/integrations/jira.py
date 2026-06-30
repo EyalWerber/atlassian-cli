@@ -290,9 +290,27 @@ class JiraClient:
             fields["priority"] = {"name": priority}
         try:
             issue = self._jira.create_issue(fields=fields)
-            return issue["key"]
+            new_key = issue["key"]
         except Exception as e:
             raise RuntimeError(_friendly_error(e)) from e
+
+        # If a parent was given and it's a Feature, link the new issue to it.
+        # Jira Cloud won't allow Feature→Story parent-child (same hierarchy level),
+        # so we use the "implements" link type as a workaround.
+        if parent_key and issue_type.lower() in ("story", "bug", "task"):
+            try:
+                parent_data = self._jira.issue(parent_key, fields="issuetype")
+                parent_type = parent_data["fields"]["issuetype"]["name"].lower()
+                if parent_type == "feature":
+                    self._jira.create_issue_link(data={
+                        "type": {"name": "implements"},
+                        "inwardIssue": {"key": new_key},
+                        "outwardIssue": {"key": parent_key},
+                    })
+            except Exception:
+                pass  # link is best-effort; don't fail the whole create
+
+        return new_key
 
     def update_issue(
         self,
