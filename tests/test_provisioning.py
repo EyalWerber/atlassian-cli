@@ -273,6 +273,27 @@ def test_ensure_issue_types_ignores_project_scoped_globals():
     assert api.post.called
 
 
+def test_ensure_issue_types_raises_when_no_scheme():
+    api = _issue_type_api(
+        project_types=[{"id": "1", "name": "Task"}],
+        global_types=[{"id": "10", "name": "Epic"}],
+    )
+
+    def get(url, params=None):
+        resp = MagicMock()
+        if url.endswith("/rest/api/3/issuetype"):
+            resp.json.return_value = [{"id": "10", "name": "Epic"}]
+        elif "/issuetypescheme/project" in url:
+            resp.json.return_value = {"values": []}
+        else:
+            resp.json.return_value = {"id": "10001", "issueTypes": [{"id": "1", "name": "Task"}]}
+        return resp
+
+    api.get.side_effect = get
+    with pytest.raises(p.JiraError):
+        p.ensure_issue_types(api, "https://x", "SI")
+
+
 def test_ensure_confluence_space_verifies_existing():
     conf = MagicMock()
     out = p.ensure_confluence_space(conf, "dev", create=False)
@@ -287,6 +308,15 @@ def test_ensure_confluence_space_creates():
     out = p.ensure_confluence_space(conf, "dev", name="Dev Space", create=True)
     conf.create_space.assert_called_once_with("DEV", "Dev Space")
     assert out == {"key": "DEV", "created": True}
+
+
+def test_ensure_confluence_space_wraps_creation_failure():
+    conf = MagicMock()
+    conf.get_space.side_effect = Exception("404")
+    conf.create_space.side_effect = Exception("space key in use")
+    with pytest.raises(p.ConfluenceError) as exc:
+        p.ensure_confluence_space(conf, "dev", name="Dev Space", create=True)
+    assert "space key in use" in str(exc.value)
 
 
 def test_ensure_confluence_space_raises_when_missing_and_not_creating():
