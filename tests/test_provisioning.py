@@ -76,6 +76,7 @@ def test_errors_are_provisioning_errors():
 
 
 import base64
+import subprocess
 from unittest.mock import MagicMock, patch
 
 
@@ -132,6 +133,29 @@ def test_ollama_list_models_returns_names():
 def test_ollama_list_models_returns_empty_when_unreachable():
     with patch("atlassian_cli.provisioning.requests.get", side_effect=OSError("down")):
         assert p.ollama_list_models("http://h") == []
+
+
+def test_ollama_pull_returns_true_on_success():
+    with patch("atlassian_cli.provisioning.subprocess.run", return_value=MagicMock(returncode=0)):
+        assert p.ollama_pull("llama3.2") is True
+
+
+def test_ollama_pull_returns_false_on_nonzero_exit():
+    with patch("atlassian_cli.provisioning.subprocess.run", return_value=MagicMock(returncode=1)):
+        assert p.ollama_pull("llama3.2") is False
+
+
+def test_ollama_pull_returns_false_when_binary_missing():
+    with patch("atlassian_cli.provisioning.subprocess.run", side_effect=FileNotFoundError):
+        assert p.ollama_pull("llama3.2") is False
+
+
+def test_ollama_pull_returns_false_on_timeout():
+    with patch(
+        "atlassian_cli.provisioning.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd="ollama", timeout=300),
+    ):
+        assert p.ollama_pull("llama3.2") is False
 
 
 def test_turso_available_false_when_missing():
