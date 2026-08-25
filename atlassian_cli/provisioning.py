@@ -182,3 +182,139 @@ def turso_create_db(db_name: str) -> tuple[str, str]:
         capture_output=True, text=True, check=True, shell=sh,
     ).stdout.strip()
     return url, token
+
+
+# Full hierarchy: Epic → Feature → Story → Task/Sub-task → Bug.
+# (name, description, avatarId, type)
+ISSUE_TYPES: list[tuple[str, str, int, str]] = [
+    ("Epic",     "A large body of work that can be broken down", 10307, "standard"),
+    ("Feature",  "A new feature or product improvement",          10322, "standard"),
+    ("Story",    "A user story",                                  10315, "standard"),
+    ("Task",     "A small, concrete unit of work",                10318, "standard"),
+    ("Sub-task", "A subtask within a task or story",              10316, "subtask"),
+    ("Bug",      "A defect or unexpected behaviour",              10303, "standard"),
+]
+
+
+def _get(api, base: str, path: str, params: dict | None = None):
+    resp = api.get(f"{base}{path}", params=params)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _post(api, base: str, path: str, data: dict) -> dict:
+    resp = api.post(f"{base}{path}", json=data)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _put(api, base: str, path: str, data: dict) -> dict:
+    resp = api.put(f"{base}{path}", json=data)
+    resp.raise_for_status()
+    return resp.json() if resp.text else {}
+
+
+def ensure_jira_project(
+    jira, api, base: str, key: str, *,
+    name: str | None = None, create: bool = False, account_id: str | None = None,
+) -> dict:
+    """Verify a Jira project exists, creating it when `create` is set.
+
+    Returns {"key", "created", "id"}. Raises JiraError if it is missing and
+    `create` is False, or if creation fails.
+    """
+    key = (key or "").upper()
+    if not key:
+        raise JiraError("a Jira project key is required")
+
+    try:
+        data = jira.project(key)
+        return {"key": key, "created": False, "id": str(data.get("id", ""))}
+    except JiraError:
+        raise
+    except Exception as exc:
+        if not create:
+            raise JiraError(f"Jira project {key} not found: {exc}") from exc
+
+    payload: dict = {"key": key, "name": name or key, "projectTypeKey": "software"}
+    if account_id:
+        payload["leadAccountId"] = account_id
+    try:
+        jira.create_project_from_raw_json(payload)
+    except Exception as exc:
+        raise JiraError(f"Failed to create Jira project {key}: {exc}") from exc
+
+    try:
+        data = jira.project(key)
+        project_id = str(data.get("id", ""))
+    except Exception:
+        project_id = ""
+    return {"key": key, "created": True, "id": project_id}
+
+
+def ensure_issue_types(api, base: str, project_key: str) -> list[str]:
+    """Add every missing type in ISSUE_TYPES to the project's scheme.
+
+    Returns the names that were added. Raises JiraError if the project has no
+    issue type scheme to modify.
+    """
+    base = base.rstrip("/")
+    all_types: list[dict] = _get(api, base, "/rest/api/3/issuetype")
+    project = _get(api, base, f"/rest/api/3/project/{project_key}")
+    project_id = str(project.get("id", ""))
+    existing_names = {t["name"].lower() for t in project.get("issueTypes", [])}
+    existing_ids = {t["id"] for t in project.get("issueTypes", [])}
+
+    to_add: list[str] = []
+    added_names: list[str] = []
+    for type_name, description, avatar, itype in ISSUE_TYPES:
+        if type_name.lower() in existing_names:
+            continue
+        # A project-scoped type belongs to some other project — unusable here.
+        global_type = next(
+            (t for t in all_types
+             if t["name"].lower() == type_name.lower() and not t.get("scope")),
+            None,
+        )
+        if not global_type:
+            global_type = _post(api, base, "/rest/api/3/issuetype", {
+                "name": type_name, "description": description,
+                "type": itype, "avatarId": avatar,
+            })
+        type_id = global_type.get("id")
+        if type_id and type_id not in existing_ids:
+            to_add.append(type_id)
+            added_names.append(type_name)
+
+    if not to_add:
+        return []
+
+    scheme = _get(api, base, "/rest/api/3/issuetypescheme/project",
+                  {"projectId": project_id})
+    entries = scheme.get("values", [])
+    if not entries:
+        raise JiraError(f"no issue type scheme found for project {project_key}")
+    scheme_id = entries[0]["issueTypeScheme"]["id"]
+    _put(api, base, f"/rest/api/3/issuetypescheme/{scheme_id}/issuetype",
+         {"issueTypeIds": to_add})
+    return added_names
+
+
+def ensure_confluence_space(
+    conf, key: str, *, name: str | None = None, create: bool = False,
+) -> dict:
+    """Verify a Confluence space exists, creating it when `create` is set."""
+    key = (key or "").upper()
+    if not key:
+        raise ConfluenceError("a Confluence space key is required")
+    try:
+        conf.get_space(key)
+        return {"key": key, "created": False}
+    except Exception as exc:
+        if not create:
+            raise ConfluenceError(f"Confluence space {key} not found: {exc}") from exc
+    try:
+        conf.create_space(key, name or key)
+    except Exception as exc:
+        raise ConfluenceError(f"Failed to create Confluence space {key}: {exc}") from exc
+    return {"key": key, "created": True}

@@ -173,3 +173,124 @@ def test_turso_create_db_returns_url_and_token():
 
     with patch("atlassian_cli.provisioning.subprocess.run", side_effect=fake_run):
         assert p.turso_create_db("db") == ("libsql://db.turso.io", "tok-123")
+
+
+def test_issue_types_cover_the_full_hierarchy():
+    names = [t[0] for t in p.ISSUE_TYPES]
+    assert names == ["Epic", "Feature", "Story", "Task", "Sub-task", "Bug"]
+
+
+def test_ensure_jira_project_verifies_existing():
+    jira = MagicMock()
+    jira.project.return_value = {"id": "10001", "key": "SI"}
+    out = p.ensure_jira_project(jira, MagicMock(), "https://x", "si", create=False)
+    assert out == {"key": "SI", "created": False, "id": "10001"}
+    jira.create_project_from_raw_json.assert_not_called()
+
+
+def test_ensure_jira_project_raises_when_missing_and_not_creating():
+    jira = MagicMock()
+    jira.project.side_effect = Exception("404")
+    with pytest.raises(p.JiraError):
+        p.ensure_jira_project(jira, MagicMock(), "https://x", "SI", create=False)
+
+
+def test_ensure_jira_project_creates_with_lead():
+    jira = MagicMock()
+    jira.project.side_effect = [Exception("404"), {"id": "10002", "key": "NEW"}]
+    out = p.ensure_jira_project(
+        jira, MagicMock(), "https://x", "new",
+        name="New Thing", create=True, account_id="acct-1",
+    )
+    payload = jira.create_project_from_raw_json.call_args[0][0]
+    assert payload == {
+        "key": "NEW", "name": "New Thing",
+        "projectTypeKey": "software", "leadAccountId": "acct-1",
+    }
+    assert out == {"key": "NEW", "created": True, "id": "10002"}
+
+
+def test_ensure_jira_project_wraps_creation_failure():
+    jira = MagicMock()
+    jira.project.side_effect = Exception("404")
+    jira.create_project_from_raw_json.side_effect = Exception("key taken")
+    with pytest.raises(p.JiraError) as exc:
+        p.ensure_jira_project(jira, MagicMock(), "https://x", "SI", name="S", create=True)
+    assert "key taken" in str(exc.value)
+
+
+def _issue_type_api(project_types, global_types):
+    """Fake api_session whose GETs answer the two endpoints ensure_issue_types uses."""
+    api = MagicMock()
+
+    def get(url, params=None):
+        resp = MagicMock()
+        if url.endswith("/rest/api/3/issuetype"):
+            resp.json.return_value = global_types
+        elif "/issuetypescheme/project" in url:
+            resp.json.return_value = {"values": [{"issueTypeScheme": {"id": "77"}}]}
+        else:
+            resp.json.return_value = {"id": "10001", "issueTypes": project_types}
+        return resp
+
+    api.get.side_effect = get
+    api.put.return_value = MagicMock(text="{}", json=lambda: {})
+    api.post.return_value = MagicMock(json=lambda: {"id": "999"})
+    return api
+
+
+def test_ensure_issue_types_adds_only_missing():
+    api = _issue_type_api(
+        project_types=[{"id": "1", "name": "Task"}, {"id": "2", "name": "Bug"}],
+        global_types=[
+            {"id": "10", "name": "Epic"}, {"id": "11", "name": "Feature"},
+            {"id": "12", "name": "Story"}, {"id": "13", "name": "Sub-task"},
+        ],
+    )
+    added = p.ensure_issue_types(api, "https://x", "SI")
+    assert added == ["Epic", "Feature", "Story", "Sub-task"]
+    sent = api.put.call_args.kwargs["json"]["issueTypeIds"]
+    assert sent == ["10", "11", "12", "13"]
+
+
+def test_ensure_issue_types_noop_when_all_present():
+    api = _issue_type_api(
+        project_types=[{"id": str(i), "name": n} for i, n in enumerate(
+            ["Epic", "Feature", "Story", "Task", "Sub-task", "Bug"])],
+        global_types=[],
+    )
+    assert p.ensure_issue_types(api, "https://x", "SI") == []
+    api.put.assert_not_called()
+
+
+def test_ensure_issue_types_ignores_project_scoped_globals():
+    api = _issue_type_api(
+        project_types=[],
+        global_types=[{"id": "10", "name": "Epic", "scope": {"type": "PROJECT"}}],
+    )
+    p.ensure_issue_types(api, "https://x", "SI")
+    # scoped type is unusable, so a fresh global one is created instead
+    assert api.post.called
+
+
+def test_ensure_confluence_space_verifies_existing():
+    conf = MagicMock()
+    out = p.ensure_confluence_space(conf, "dev", create=False)
+    assert out == {"key": "DEV", "created": False}
+    conf.get_space.assert_called_once_with("DEV")
+    conf.create_space.assert_not_called()
+
+
+def test_ensure_confluence_space_creates():
+    conf = MagicMock()
+    conf.get_space.side_effect = Exception("404")
+    out = p.ensure_confluence_space(conf, "dev", name="Dev Space", create=True)
+    conf.create_space.assert_called_once_with("DEV", "Dev Space")
+    assert out == {"key": "DEV", "created": True}
+
+
+def test_ensure_confluence_space_raises_when_missing_and_not_creating():
+    conf = MagicMock()
+    conf.get_space.side_effect = Exception("404")
+    with pytest.raises(p.ConfluenceError):
+        p.ensure_confluence_space(conf, "DEV", create=False)

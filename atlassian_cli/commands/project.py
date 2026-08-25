@@ -178,79 +178,41 @@ def init() -> None:
         if jira_choice == "n":
             proj_name = typer.prompt("  Project name")
             proj_key = typer.prompt("  Project key (e.g. MYAPP)").upper()
+            _api = _prov.api_session(
+                collected["atlassian_url"], collected["atlassian_email"],
+                collected["atlassian_api_token"],
+            )
             with console.status("[bold green]Creating Jira project...[/bold green]"):
                 try:
-                    payload: dict = {
-                        "key": proj_key,
-                        "name": proj_name,
-                        "projectTypeKey": "software",
-                    }
-                    if _account_id:
-                        payload["leadAccountId"] = _account_id
-                    _jira.create_project_from_raw_json(payload)
+                    _prov.ensure_jira_project(
+                        _jira, _api, collected["atlassian_url"], proj_key,
+                        name=proj_name, create=True, account_id=_account_id,
+                    )
                     console.print(f"[green]✓[/green] Created Jira project: {proj_key}")
-                except Exception as exc:
-                    console.print(f"[red]✗[/red] Failed to create project: {exc}")
+                except _prov.JiraError as exc:
+                    console.print(f"[red]✗[/red] {exc}")
                     raise typer.Exit(1)
             collected["jira_project"] = proj_key
 
-            # ── Ensure Bug issue type is in the new project's scheme ──────
             with console.status("[bold green]Configuring mandatory issue types...[/bold green]"):
                 try:
-                    _base = collected["atlassian_url"].rstrip("/")
-                    _session = _make_api_session(
-                        _base, collected["atlassian_email"], collected["atlassian_api_token"]
+                    added = _prov.ensure_issue_types(
+                        _api, collected["atlassian_url"], proj_key
                     )
-                    _all_types: list[dict] = _session.get(
-                        f"{_base}/rest/api/3/issuetype"
-                    ).json()
-                    _proj_data = _session.get(
-                        f"{_base}/rest/api/3/project/{proj_key}"
-                    ).json()
-                    _proj_id = _proj_data.get("id", "")
-                    _existing_names = {t["name"].lower() for t in _proj_data.get("issueTypes", [])}
-                    _existing_ids = {t["id"] for t in _proj_data.get("issueTypes", [])}
-
-                    _to_add: list[str] = []
-                    _added_labels: list[str] = []
-                    # Full hierarchy: Epic → Feature → Story → Task/Sub-task → Bug
-                    for _type_name, _desc, _avatar, _itype in [
-                        ("Epic",     "A large body of work that can be broken down", 10307, "standard"),
-                        ("Feature",  "A new feature or product improvement",          10322, "standard"),
-                        ("Story",    "A user story",                                  10315, "standard"),
-                        ("Task",     "A small, concrete unit of work",                10318, "standard"),
-                        ("Sub-task", "A subtask within a task or story",              10316, "subtask"),
-                        ("Bug",      "A defect or unexpected behaviour",              10303, "standard"),
-                    ]:
-                        if _type_name.lower() not in _existing_names:
-                            _gtype = next(
-                                (t for t in _all_types
-                                 if t["name"].lower() == _type_name.lower() and not t.get("scope")),
-                                None,
-                            )
-                            if not _gtype:
-                                _gtype = _session.post(
-                                    f"{_base}/rest/api/3/issuetype",
-                                    json={"name": _type_name, "description": _desc,
-                                          "type": _itype, "avatarId": _avatar},
-                                ).json()
-                            if _gtype.get("id") and _gtype["id"] not in _existing_ids:
-                                _to_add.append(_gtype["id"])
-                                _added_labels.append(_type_name)
-
-                    if _to_add:
-                        _add_issue_types_to_project(_session, _base, _proj_id, _to_add)
-                        console.print(f"[green]✓[/green] Added issue types: {', '.join(_added_labels)}")
+                    if added:
+                        console.print(f"[green]✓[/green] Added issue types: {', '.join(added)}")
                     else:
-                        console.print(f"[dim]All issue types already present[/dim]")
+                        console.print("[dim]All issue types already present[/dim]")
                 except Exception as exc:
                     console.print(f"[yellow]⚠[/yellow]  Could not configure issue types: {exc}")
         else:
             proj_key = typer.prompt("  Project key", default="MYAPP").upper()
             try:
-                _jira.project(proj_key)
+                _prov.ensure_jira_project(
+                    _jira, None, collected["atlassian_url"], proj_key, create=False
+                )
                 console.print(f"[green]✓[/green] Found Jira project: {proj_key}")
-            except Exception:
+            except _prov.JiraError:
                 console.print(f"[yellow]⚠[/yellow]  Could not verify project {proj_key}.")
                 if not typer.confirm("  Continue anyway (set manually in .env later)?", default=False):
                     raise typer.Exit(1)
@@ -272,18 +234,20 @@ def init() -> None:
             space_key = typer.prompt("  Space key (e.g. DEV)").upper()
             with console.status("[bold green]Creating Confluence space...[/bold green]"):
                 try:
-                    _conf.create_space(space_key, space_name)
+                    _prov.ensure_confluence_space(
+                        _conf, space_key, name=space_name, create=True
+                    )
                     console.print(f"[green]✓[/green] Created Confluence space: {space_key}")
-                except Exception as exc:
-                    console.print(f"[red]✗[/red] Failed to create space: {exc}")
+                except _prov.ConfluenceError as exc:
+                    console.print(f"[red]✗[/red] {exc}")
                     raise typer.Exit(1)
             collected["confluence_space"] = space_key
         else:
             space_key = typer.prompt("  Space key", default="DEV").upper()
             try:
-                _conf.get_space(space_key)
+                _prov.ensure_confluence_space(_conf, space_key, create=False)
                 console.print(f"[green]✓[/green] Found Confluence space: {space_key}")
-            except Exception:
+            except _prov.ConfluenceError:
                 console.print(f"[yellow]⚠[/yellow]  Could not verify space {space_key}.")
                 if not typer.confirm("  Continue anyway (set manually in .env later)?", default=False):
                     raise typer.Exit(1)
