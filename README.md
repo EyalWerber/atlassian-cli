@@ -75,6 +75,10 @@ The wizard will:
    - If Turso is chosen and the `turso` CLI is present, it can create the database automatically
 6. Write `.env` in the current directory and verify all connections
 
+> `atlassian project init` is now a prompt layer over `atlassian_cli.provisioning`,
+> the headless core it shares with supreme-leader's `init_project` MCP tool.
+> Behavior is unchanged; use whichever front end fits.
+
 ### Features
 
 ```bash
