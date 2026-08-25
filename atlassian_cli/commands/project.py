@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import base64
 import json
-import os
 import shutil
-import subprocess
+# Unused by this module since the extraction, but tests/test_project_init.py
+# patches `atlassian_cli.commands.project.subprocess.run` (the frozen refactor
+# safety net), so the name has to stay bound here.
+import subprocess  # noqa: F401
 import types
 from pathlib import Path
 
@@ -184,11 +185,16 @@ def init() -> None:
             )
             with console.status("[bold green]Creating Jira project...[/bold green]"):
                 try:
-                    _prov.ensure_jira_project(
+                    _project = _prov.ensure_jira_project(
                         _jira, _api, collected["atlassian_url"], proj_key,
                         name=proj_name, create=True, account_id=_account_id,
                     )
-                    console.print(f"[green]✓[/green] Created Jira project: {proj_key}")
+                    # create=True is idempotent: an existing key is reused
+                    # rather than being an error. Say which one happened.
+                    _verb = "Created" if _project["created"] else "Found existing"
+                    console.print(
+                        f"[green]✓[/green] {_verb} Jira project: {proj_key}"
+                    )
                 except _prov.JiraError as exc:
                     console.print(f"[red]✗[/red] {exc}")
                     raise typer.Exit(1)
@@ -234,10 +240,13 @@ def init() -> None:
             space_key = typer.prompt("  Space key (e.g. DEV)").upper()
             with console.status("[bold green]Creating Confluence space...[/bold green]"):
                 try:
-                    _prov.ensure_confluence_space(
+                    _space = _prov.ensure_confluence_space(
                         _conf, space_key, name=space_name, create=True
                     )
-                    console.print(f"[green]✓[/green] Created Confluence space: {space_key}")
+                    _verb = "Created" if _space["created"] else "Found existing"
+                    console.print(
+                        f"[green]✓[/green] {_verb} Confluence space: {space_key}"
+                    )
                 except _prov.ConfluenceError as exc:
                     console.print(f"[red]✗[/red] {exc}")
                     raise typer.Exit(1)
