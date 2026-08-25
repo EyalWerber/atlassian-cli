@@ -23,17 +23,7 @@ console = Console()
 
 
 def _atlassian_session(cls, url: str, email: str, token: str):
-    """Instantiate an atlassian client with UTF-8 Basic auth.
-
-    requests._basic_auth_str encodes credentials as latin-1, which raises
-    UnicodeEncodeError for any non-latin-1 character. We bypass it by setting
-    the Authorization header directly using UTF-8 (RFC 7617).
-    """
-    client = cls(url=url, cloud=True)
-    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
-    client._session.headers["Authorization"] = f"Basic {auth}"
-    client._session.auth = None  # prevent any residual session auth from interfering
-    return client
+    return _prov.session(cls, url, email, token)
 
 
 @app.callback()
@@ -42,53 +32,19 @@ def _group() -> None:
 
 
 def _ollama_list_models(host: str) -> list[str]:
-    try:
-        resp = requests.get(f"{host}/api/tags", timeout=5)
-        resp.raise_for_status()
-        return [m["name"] for m in resp.json().get("models", [])]
-    except Exception:
-        return []
+    return _prov.ollama_list_models(host)
 
 
 def _ollama_pull(model: str) -> bool:
-    try:
-        result = subprocess.run(["ollama", "pull", model], timeout=300)
-        return result.returncode == 0
-    except Exception:
-        return False
+    return _prov.ollama_pull(model)
 
 
 def _turso_available() -> bool:
-    """Return True only if turso CLI is actually runnable (not just present on disk).
-
-    shutil.which finds .cmd wrappers on Windows but subprocess can't run them
-    without shell=True. This function probes with a real invocation to avoid
-    false positives.
-    """
-    try:
-        result = subprocess.run(
-            ["turso", "--version"],
-            capture_output=True,
-            timeout=5,
-            shell=(os.name == "nt"),
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
+    return _prov.turso_available()
 
 
 def _turso_create_db(db_name: str) -> tuple[str, str]:
-    _sh = os.name == "nt"  # .cmd wrappers on Windows require shell=True
-    subprocess.run(["turso", "db", "create", db_name], check=True, shell=_sh)
-    url = subprocess.run(
-        ["turso", "db", "show", db_name, "--url"],
-        capture_output=True, text=True, check=True, shell=_sh,
-    ).stdout.strip()
-    token = subprocess.run(
-        ["turso", "db", "tokens", "create", db_name],
-        capture_output=True, text=True, check=True, shell=_sh,
-    ).stdout.strip()
-    return url, token
+    return _prov.turso_create_db(db_name)
 
 
 _PROGRESS_FILE = Path(".atlassian-init-progress.json")
@@ -201,20 +157,10 @@ def init() -> None:
 
     with console.status("[bold green]Verifying credentials…[/bold green]"):
         try:
-            _me = _jira.myself()
-            _account_id = _me.get("accountId") if isinstance(_me, dict) else None
+            _account_id = _prov.verify_credentials(_jira)
             console.print("[green]✓[/green] Credentials verified")
-        except Exception as exc:
-            msg = str(exc).lower()
-            if "401" in str(exc) or "not authenticated" in msg or "unauthorized" in msg:
-                console.print("[red]✗ Authentication failed.[/red] Check your email and API token.")
-                console.print(
-                    "  Create a token at: "
-                    "[link=https://id.atlassian.com/manage-profile/security/api-tokens]"
-                    "https://id.atlassian.com/manage-profile/security/api-tokens[/link]"
-                )
-            else:
-                console.print(f"[red]✗[/red] Could not connect to Jira: {exc}")
+        except _prov.AuthError as exc:
+            console.print(f"[red]✗[/red] {exc}")
             raise typer.Exit(1)
 
     # Preserve progress from previous steps already completed
@@ -583,10 +529,7 @@ def _find_or_create_issue_type(
 
 
 def _make_api_session(url: str, email: str, token: str) -> requests.Session:
-    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
-    s = requests.Session()
-    s.headers.update({"Authorization": f"Basic {auth}", "Accept": "application/json", "Content-Type": "application/json"})
-    return s
+    return _prov.api_session(url, email, token)
 
 
 def _api_get(session: requests.Session, base: str, path: str, params: dict | None = None) -> dict | list:

@@ -9,7 +9,12 @@ present a failure.
 
 from __future__ import annotations
 
+import base64
+import os
+import subprocess
 from pathlib import Path
+
+import requests
 
 
 class ProvisioningError(Exception):
@@ -88,3 +93,92 @@ def ensure_gitignored(root: Path, entries: list[str]) -> list[str]:
     with gitignore.open("a", encoding="utf-8") as fh:
         fh.write(prefix + "".join(f"{e}\n" for e in missing))
     return missing
+
+
+def session(cls, url: str, email: str, token: str):
+    """Instantiate an atlassian client with UTF-8 Basic auth.
+
+    `requests._basic_auth_str` encodes credentials as latin-1, which raises
+    UnicodeEncodeError for any non-latin-1 character. We bypass it by setting
+    the Authorization header directly using UTF-8 (RFC 7617).
+    """
+    client = cls(url=url.rstrip("/"), cloud=True)
+    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
+    client._session.headers["Authorization"] = f"Basic {auth}"
+    client._session.auth = None  # stop residual session auth from interfering
+    return client
+
+
+def api_session(base: str, email: str, token: str) -> "requests.Session":
+    """A plain requests session for the Jira REST endpoints the clients don't cover."""
+    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
+    s = requests.Session()
+    s.headers.update({
+        "Authorization": f"Basic {auth}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    })
+    return s
+
+
+def verify_credentials(jira) -> str | None:
+    """Return the caller's Atlassian accountId. Raises AuthError if rejected."""
+    try:
+        me = jira.myself()
+    except Exception as exc:
+        text = str(exc).lower()
+        if "401" in str(exc) or "not authenticated" in text or "unauthorized" in text:
+            raise AuthError(
+                "Authentication failed — check the email and API token. Create one at "
+                "https://id.atlassian.com/manage-profile/security/api-tokens"
+            ) from exc
+        raise AuthError(f"Could not connect to Jira: {exc}") from exc
+    return me.get("accountId") if isinstance(me, dict) else None
+
+
+def ollama_list_models(host: str) -> list[str]:
+    """Model names installed on the Ollama host. Empty list if unreachable."""
+    try:
+        resp = requests.get(f"{host}/api/tags", timeout=5)
+        resp.raise_for_status()
+        return [m["name"] for m in resp.json().get("models", [])]
+    except Exception:
+        return []
+
+
+def ollama_pull(model: str) -> bool:
+    try:
+        return subprocess.run(["ollama", "pull", model], timeout=300).returncode == 0
+    except Exception:
+        return False
+
+
+def turso_available() -> bool:
+    """True only if the turso CLI is actually runnable, not merely on disk.
+
+    `shutil.which` finds .cmd wrappers on Windows that subprocess cannot run
+    without shell=True, so we probe with a real invocation instead.
+    """
+    try:
+        result = subprocess.run(
+            ["turso", "--version"],
+            capture_output=True, timeout=5, shell=(os.name == "nt"),
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def turso_create_db(db_name: str) -> tuple[str, str]:
+    """Create a Turso database and return (url, auth_token)."""
+    sh = os.name == "nt"  # .cmd wrappers on Windows require shell=True
+    subprocess.run(["turso", "db", "create", db_name], check=True, shell=sh)
+    url = subprocess.run(
+        ["turso", "db", "show", db_name, "--url"],
+        capture_output=True, text=True, check=True, shell=sh,
+    ).stdout.strip()
+    token = subprocess.run(
+        ["turso", "db", "tokens", "create", db_name],
+        capture_output=True, text=True, check=True, shell=sh,
+    ).stdout.strip()
+    return url, token
