@@ -70,6 +70,31 @@ def test_ensure_gitignored_noop_outside_git_repo(tmp_path):
     assert not (tmp_path / ".gitignore").exists()
 
 
+def test_ensure_gitignored_force_writes_without_a_dot_git(tmp_path):
+    """A directory nested in a repo is tracked but has no `.git` of its own.
+
+    The caller that already knows git covers this path passes force=True; a
+    .gitignore in a subdirectory applies to that subtree.
+    """
+    added = p.ensure_gitignored(tmp_path, [".env", "memory/"], force=True)
+    assert added == [".env", "memory/"]
+    assert (tmp_path / ".gitignore").read_text(encoding="utf-8") == ".env\nmemory/\n"
+
+
+def test_ensure_gitignored_force_still_skips_covered_entries(tmp_path):
+    (tmp_path / ".gitignore").write_text(".env\n", encoding="utf-8")
+    assert p.ensure_gitignored(tmp_path, [".env"], force=True) == []
+
+
+def test_basic_auth_header_is_utf8_base64(tmp_path):
+    import base64
+    header = p.basic_auth_header("\u00e9@ex.com", "tok")
+    assert header.startswith("Basic ")
+    decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
+    assert decoded == "\u00e9@ex.com:tok"
+    assert p.basic_auth_value("\u00e9@ex.com", "tok") == header.split(" ", 1)[1]
+
+
 def test_errors_are_provisioning_errors():
     for cls in (p.AuthError, p.JiraError, p.ConfluenceError):
         assert issubclass(cls, p.ProvisioningError)

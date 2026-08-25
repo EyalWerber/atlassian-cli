@@ -67,13 +67,19 @@ def render_env(values: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def ensure_gitignored(root: Path, entries: list[str]) -> list[str]:
+def ensure_gitignored(root: Path, entries: list[str], *,
+                      force: bool = False) -> list[str]:
     """Append each entry to `root/.gitignore` if absent. Returns what was added.
 
-    A no-op outside a git repository — there is nothing to ignore yet.
+    A no-op outside a git repository — there is nothing to ignore yet. The
+    `.git` probe only recognises a repository *toplevel*, so a caller that
+    already knows the directory is tracked (a path nested inside a larger repo,
+    where `git rev-parse` says yes but there is no `.git` here) must pass
+    `force=True`. A `.gitignore` in a subdirectory applies to that subtree, so
+    writing one there is correct and sufficient.
     """
     root = Path(root)
-    if not (root / ".git").exists():
+    if not force and not (root / ".git").exists():
         return []
     gitignore = root / ".gitignore"
     existing_text = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
@@ -95,6 +101,21 @@ def ensure_gitignored(root: Path, entries: list[str]) -> list[str]:
     return missing
 
 
+def basic_auth_value(email: str, token: str) -> str:
+    """The base64 half of an HTTP Basic `Authorization` header, UTF-8 encoded.
+
+    The single definition of how the credential is put on the wire. Callers that
+    have to recognise it again — a token scrubber, for one — encode it the same
+    way by calling this.
+    """
+    return base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
+
+
+def basic_auth_header(email: str, token: str) -> str:
+    """The full `Authorization` header value: `Basic <base64(email:token)>`."""
+    return f"Basic {basic_auth_value(email, token)}"
+
+
 def session(cls, url: str, email: str, token: str):
     """Instantiate an atlassian client with UTF-8 Basic auth.
 
@@ -103,18 +124,16 @@ def session(cls, url: str, email: str, token: str):
     the Authorization header directly using UTF-8 (RFC 7617).
     """
     client = cls(url=url.rstrip("/"), cloud=True)
-    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
-    client._session.headers["Authorization"] = f"Basic {auth}"
+    client._session.headers["Authorization"] = basic_auth_header(email, token)
     client._session.auth = None  # stop residual session auth from interfering
     return client
 
 
 def api_session(base: str, email: str, token: str) -> "requests.Session":
     """A plain requests session for the Jira REST endpoints the clients don't cover."""
-    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
     s = requests.Session()
     s.headers.update({
-        "Authorization": f"Basic {auth}",
+        "Authorization": basic_auth_header(email, token),
         "Accept": "application/json",
         "Content-Type": "application/json",
     })
