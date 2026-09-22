@@ -188,6 +188,66 @@ def add_comment(key: str, body: str) -> dict:
     return {"key": key}
 
 
+def set_parent(key: str, parent_key: str | None = None) -> dict:
+    _get_jira().set_parent(key, parent_key)
+    return {"key": key, "parent": parent_key}
+
+
+def list_projects() -> list[dict]:
+    return _get_jira().list_projects()
+
+
+def get_project(key: str) -> dict:
+    return _get_jira().get_project(key)
+
+
+def create_project(
+    key: str,
+    name: str,
+    share_with: str | None = None,
+    description: str = "",
+) -> dict:
+    return _get_jira().create_project(
+        key=key, name=name, share_with=share_with, description=description,
+    )
+
+
+def link_issues(
+    inward_key: str,
+    outward_key: str,
+    link_type: str = "Relates",
+) -> dict:
+    _get_jira().add_link(inward_key, link_type, outward_key)
+    return {"inward_key": inward_key, "link_type": link_type, "outward_key": outward_key}
+
+
+def list_issue_links(key: str) -> list[dict]:
+    return _get_jira().list_links(key)
+
+
+def unlink_issues(
+    key: str,
+    other_key: str | None = None,
+    link_type: str = "Relates",
+    link_id: str | None = None,
+) -> dict:
+    jira = _get_jira()
+    if link_id is None:
+        if not other_key:
+            raise ValueError("Provide either link_id, or other_key together with link_type.")
+        match = next(
+            (lnk for lnk in jira.list_links(key)
+             if lnk["type"] == link_type
+             and other_key in (lnk["outward_key"], lnk["inward_key"])),
+            None,
+        )
+        if not match:
+            raise ValueError(f"No '{link_type}' link between {key} and {other_key} found.")
+        link_id = match["id"]
+    jira.remove_link(link_id)
+    return {"key": key, "removed_link_id": link_id}
+
+
 def resolve_bug(
     key: str,
     solution: str,
@@ -382,6 +442,118 @@ _TOOLS: list[Tool] = [
             "required": ["key", "solution"],
         },
     ),
+    Tool(
+        name="set_parent",
+        description=(
+            "Re-parent an existing issue, or detach it by omitting parent_key. update_issue "
+            "cannot do this. A child must sit at a LOWER hierarchy level than its parent: an "
+            "Epic (level 1) can parent a Story, Task or Feature (level 0), and those can parent "
+            "a Subtask (level -1). Two level-0 issues cannot be nested — to associate a Story "
+            "with a Feature, use link_issues instead, and parent both to the Epic."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Issue to re-parent, e.g. CONA-3"},
+                "parent_key": {"type": "string", "description": "New parent, e.g. CONA-1. Omit to detach."},
+            },
+            "required": ["key"],
+        },
+    ),
+    Tool(
+        name="list_projects",
+        description="List every Jira project on the site with its key, name, id, style and type.",
+        inputSchema={"type": "object", "properties": {}},
+        annotations=ToolAnnotations(readOnlyHint=True),
+    ),
+    Tool(
+        name="get_project",
+        description=(
+            "Fetch one Jira project: key, name, id, style (classic vs next-gen) and the "
+            "issue types available in it. Use this to confirm a project offers the issue "
+            "types you need — e.g. 'Feature' — before creating issues in it."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {"key": {"type": "string", "description": "Project key, e.g. YDMC"}},
+            "required": ["key"],
+        },
+        annotations=ToolAnnotations(readOnlyHint=True),
+    ),
+    Tool(
+        name="create_project",
+        description=(
+            "Create a new Jira project. Omit share_with for the default team-managed "
+            "software template, which on most sites already provides Epic, Feature, Story, "
+            "Task, Subtask and Bug — check with get_project afterwards. Pass share_with with "
+            "the key of an existing CLASSIC project to copy its configuration instead; note "
+            "that sharing copies permission schemes and therefore FAILS on the Jira free plan."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "New project key, e.g. CONA"},
+                "name": {"type": "string", "description": "Human-readable project name"},
+                "share_with": {
+                    "type": "string",
+                    "description": "Key of an existing classic project to copy configuration from, e.g. MC",
+                },
+                "description": {"type": "string"},
+            },
+            "required": ["key", "name"],
+        },
+    ),
+    Tool(
+        name="link_issues",
+        description=(
+            "Create a link between two existing Jira issues. Use this to associate issues that "
+            "cannot be parented to each other — for example linking a Story to a Feature, since "
+            "a Feature cannot contain Stories. For parent/child nesting (Epic→Feature, "
+            "Story→Sub-task) pass parent_key to create_issue instead."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "inward_key": {"type": "string", "description": "Source issue key, e.g. YDMC-493"},
+                "outward_key": {"type": "string", "description": "Target issue key, e.g. YDMC-492"},
+                "link_type": {
+                    "type": "string",
+                    "description": "Link type name as configured in Jira. Common values: "
+                                   "'Relates', 'Blocks', 'Duplicate', 'Cloners'. Defaults to 'Relates'.",
+                },
+            },
+            "required": ["inward_key", "outward_key"],
+        },
+    ),
+    Tool(
+        name="list_issue_links",
+        description="List every issue link on a Jira issue, with each link's id, type and both endpoints.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Issue key, e.g. YDMC-492"},
+            },
+            "required": ["key"],
+        },
+        annotations=ToolAnnotations(readOnlyHint=True),
+    ),
+    Tool(
+        name="unlink_issues",
+        description=(
+            "Remove a link between two Jira issues. Either pass link_id directly (from "
+            "list_issue_links), or pass other_key with link_type to look the link up."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Issue key that owns the link, e.g. YDMC-493"},
+                "other_key": {"type": "string", "description": "The issue at the other end of the link"},
+                "link_type": {"type": "string", "description": "Defaults to 'Relates'"},
+                "link_id": {"type": "string", "description": "Link id from list_issue_links; skips lookup"},
+            },
+            "required": ["key"],
+        },
+    ),
 ]
 
 _HANDLERS: dict = {
@@ -395,6 +567,13 @@ _HANDLERS: dict = {
     "transition_issue": lambda a: transition_issue(a["key"], a["status"]),
     "add_comment": lambda a: add_comment(a["key"], a["body"]),
     "resolve_bug": lambda a: resolve_bug(a["key"], a["solution"], a.get("bug_memory_id")),
+    "set_parent": lambda a: set_parent(a["key"], a.get("parent_key")),
+    "list_projects": lambda a: list_projects(),
+    "get_project": lambda a: get_project(a["key"]),
+    "create_project": lambda a: create_project(a["key"], a["name"], a.get("share_with"), a.get("description", "")),
+    "link_issues": lambda a: link_issues(a["inward_key"], a["outward_key"], a.get("link_type", "Relates")),
+    "list_issue_links": lambda a: list_issue_links(a["key"]),
+    "unlink_issues": lambda a: unlink_issues(a["key"], a.get("other_key"), a.get("link_type", "Relates"), a.get("link_id")),
 }
 
 

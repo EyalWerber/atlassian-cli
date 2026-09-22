@@ -235,6 +235,113 @@ class JiraClient:
 
         return sorted(seen.values(), key=lambda s: (_ORDER.get(s["category_key"], 99), s["name"]))
 
+    def set_parent(self, issue_key: str, parent_key: Optional[str]) -> None:
+        """Re-parent an issue, or detach it when parent_key is None.
+
+        update_issue cannot do this: Jira treats parent as a structural field
+        rather than an ordinary editable one. A child must sit at a lower
+        hierarchy level than its parent — an Epic (level 1) may parent a Story,
+        Task or Feature (level 0), and those may parent a Subtask (level -1),
+        but two level-0 issues cannot be nested.
+        """
+        try:
+            self._jira.update_issue_field(
+                issue_key, {"parent": {"key": parent_key} if parent_key else None}
+            )
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def current_account_id(self) -> str:
+        try:
+            return self._jira.get("rest/api/3/myself")["accountId"]
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def list_projects(self) -> list[dict]:
+        try:
+            return [
+                {
+                    "key": p["key"],
+                    "name": p.get("name", ""),
+                    "id": p["id"],
+                    "style": p.get("style", ""),
+                    "type": p.get("projectTypeKey", ""),
+                }
+                for p in self._jira.projects()
+            ]
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+
+    def get_project(self, key: str) -> dict:
+        try:
+            p = self._jira.get(f"rest/api/3/project/{key}")
+        except Exception as e:
+            raise RuntimeError(_friendly_error(e)) from e
+        return {
+            "key": p["key"],
+            "name": p.get("name", ""),
+            "id": p["id"],
+            "style": p.get("style", ""),
+            "issue_types": [t["name"] for t in p.get("issueTypes", [])],
+        }
+
+    def create_project(
+        self,
+        key: str,
+        name: str,
+        share_with: Optional[str] = None,
+        description: str = "",
+        lead_account_id: Optional[str] = None,
+    ) -> dict:
+        """Create a Jira project.
+
+        share_with is the key of an existing CLASSIC project whose configuration —
+        issue types, workflows, screens — the new project should reuse. Sharing
+        copies permission schemes, which the Jira free plan forbids, so it fails
+        there with "Changing permission schemes is not allowed". Without
+        share_with the default team-managed software template is used, which on
+        most sites already includes Epic, Feature, Story, Task, Subtask and Bug.
+        """
+        lead = lead_account_id or self.current_account_id()
+        if share_with:
+            source = self.get_project(share_with)
+            if source["style"] != "classic":
+                raise RuntimeError(
+                    f"Cannot share configuration with {share_with}: it is a "
+                    f"{source['style']} (team-managed) project. Shared configuration "
+                    "requires a classic (company-managed) source project."
+                )
+            try:
+                self._jira.post(
+                    f"rest/project-templates/1.0/createshared/{source['id']}",
+                    data={
+                        "name": name,
+                        "key": key,
+                        "leadAccountId": lead,
+                        "description": description,
+                    },
+                )
+            except Exception as e:
+                raise RuntimeError(_friendly_error(e)) from e
+        else:
+            try:
+                self._jira.post(
+                    "rest/api/3/project",
+                    data={
+                        "key": key,
+                        "name": name,
+                        "leadAccountId": lead,
+                        "projectTypeKey": "software",
+                        "projectTemplateKey":
+                            "com.pyxis.greenhopper.jira:gh-simplified-agility-scrum",
+                        "description": description,
+                        "assigneeType": "PROJECT_LEAD",
+                    },
+                )
+            except Exception as e:
+                raise RuntimeError(_friendly_error(e)) from e
+        return self.get_project(key)
+
     def list_links(self, issue_key: str) -> list[dict]:
         try:
             fields = self._jira.issue(issue_key, fields="issuelinks")["fields"]

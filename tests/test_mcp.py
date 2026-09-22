@@ -163,7 +163,7 @@ class TestCreateIssue:
         assert result == {"key": "ACLI-15"}
         mock_jira.create_issue.assert_called_once_with(
             summary="New feature", description="desc",
-            issue_type="Feature", parent_key=None,
+            issue_type="Feature", parent_key=None, priority=None,
         )
 
     def test_passes_parent_key(self, mock_jira):
@@ -172,7 +172,7 @@ class TestCreateIssue:
         create_issue("Subtask", type="Sub-task", parent_key="ACLI-4")
         mock_jira.create_issue.assert_called_once_with(
             summary="Subtask", description="",
-            issue_type="Sub-task", parent_key="ACLI-4",
+            issue_type="Sub-task", parent_key="ACLI-4", priority=None,
         )
 
     def test_defaults_to_task_type(self, mock_jira):
@@ -181,7 +181,16 @@ class TestCreateIssue:
         create_issue("Quick task")
         mock_jira.create_issue.assert_called_once_with(
             summary="Quick task", description="",
-            issue_type="Task", parent_key=None,
+            issue_type="Task", parent_key=None, priority=None,
+        )
+
+    def test_passes_priority(self, mock_jira):
+        mock_jira.create_issue.return_value = "ACLI-18"
+        from atlassian_cli.mcp import create_issue
+        create_issue("Urgent task", priority="High")
+        mock_jira.create_issue.assert_called_once_with(
+            summary="Urgent task", description="",
+            issue_type="Task", parent_key=None, priority="High",
         )
 
 
@@ -199,3 +208,171 @@ class TestAddComment:
         result = add_comment("ACLI-4", "Fixed in latest commit")
         mock_jira.add_comment.assert_called_once_with("ACLI-4", "Fixed in latest commit")
         assert result == {"key": "ACLI-4"}
+
+
+class TestLinkIssues:
+    def test_creates_link_with_default_type(self, mock_jira):
+        from atlassian_cli.mcp import link_issues
+        result = link_issues("YDMC-493", "YDMC-492")
+        mock_jira.add_link.assert_called_once_with("YDMC-493", "Relates", "YDMC-492")
+        assert result == {
+            "inward_key": "YDMC-493",
+            "link_type": "Relates",
+            "outward_key": "YDMC-492",
+        }
+
+    def test_honours_explicit_link_type(self, mock_jira):
+        from atlassian_cli.mcp import link_issues
+        link_issues("SI-11", "SI-8", link_type="Blocks")
+        mock_jira.add_link.assert_called_once_with("SI-11", "Blocks", "SI-8")
+
+
+class TestListIssueLinks:
+    def test_passes_through_client_links(self, mock_jira):
+        mock_jira.list_links.return_value = [
+            {"id": "10001", "type": "Relates", "inward_key": "YDMC-493",
+             "inward_summary": "", "outward_key": "YDMC-492", "outward_summary": ""},
+        ]
+        from atlassian_cli.mcp import list_issue_links
+        result = list_issue_links("YDMC-493")
+        mock_jira.list_links.assert_called_once_with("YDMC-493")
+        assert result[0]["id"] == "10001"
+        assert result[0]["outward_key"] == "YDMC-492"
+
+    def test_empty(self, mock_jira):
+        mock_jira.list_links.return_value = []
+        from atlassian_cli.mcp import list_issue_links
+        assert list_issue_links("YDMC-1") == []
+
+
+class TestUnlinkIssues:
+    def test_removes_by_link_id_without_lookup(self, mock_jira):
+        from atlassian_cli.mcp import unlink_issues
+        result = unlink_issues("YDMC-493", link_id="10001")
+        mock_jira.list_links.assert_not_called()
+        mock_jira.remove_link.assert_called_once_with("10001")
+        assert result == {"key": "YDMC-493", "removed_link_id": "10001"}
+
+    def test_looks_up_link_by_counterpart_key(self, mock_jira):
+        mock_jira.list_links.return_value = [
+            {"id": "10001", "type": "Blocks", "inward_key": "YDMC-493", "outward_key": "YDMC-999"},
+            {"id": "10002", "type": "Relates", "inward_key": "YDMC-493", "outward_key": "YDMC-492"},
+        ]
+        from atlassian_cli.mcp import unlink_issues
+        result = unlink_issues("YDMC-493", other_key="YDMC-492")
+        mock_jira.remove_link.assert_called_once_with("10002")
+        assert result["removed_link_id"] == "10002"
+
+    def test_matches_counterpart_on_inward_side(self, mock_jira):
+        mock_jira.list_links.return_value = [
+            {"id": "10003", "type": "Relates", "inward_key": "YDMC-492", "outward_key": "YDMC-493"},
+        ]
+        from atlassian_cli.mcp import unlink_issues
+        unlink_issues("YDMC-493", other_key="YDMC-492")
+        mock_jira.remove_link.assert_called_once_with("10003")
+
+    def test_requires_other_key_or_link_id(self, mock_jira):
+        from atlassian_cli.mcp import unlink_issues
+        with pytest.raises(ValueError, match="link_id"):
+            unlink_issues("YDMC-493")
+        mock_jira.remove_link.assert_not_called()
+
+    def test_raises_when_no_matching_link(self, mock_jira):
+        mock_jira.list_links.return_value = [
+            {"id": "10001", "type": "Blocks", "inward_key": "YDMC-493", "outward_key": "YDMC-999"},
+        ]
+        from atlassian_cli.mcp import unlink_issues
+        with pytest.raises(ValueError, match="No 'Relates' link"):
+            unlink_issues("YDMC-493", other_key="YDMC-492")
+        mock_jira.remove_link.assert_not_called()
+
+
+class TestLinkToolsRegistered:
+    def test_tools_and_handlers_are_wired(self):
+        from atlassian_cli.mcp import _HANDLERS, _TOOLS
+        names = {t.name for t in _TOOLS}
+        for tool in ("link_issues", "list_issue_links", "unlink_issues"):
+            assert tool in names
+            assert tool in _HANDLERS
+
+    def test_handlers_apply_defaults(self, mock_jira):
+        from atlassian_cli.mcp import _HANDLERS
+        _HANDLERS["link_issues"]({"inward_key": "A-1", "outward_key": "A-2"})
+        mock_jira.add_link.assert_called_once_with("A-1", "Relates", "A-2")
+
+
+class TestListProjects:
+    def test_passes_through(self, mock_jira):
+        mock_jira.list_projects.return_value = [
+            {"key": "MC", "name": "Mission Control", "id": "10364",
+             "style": "classic", "type": "software"},
+        ]
+        from atlassian_cli.mcp import list_projects
+        result = list_projects()
+        mock_jira.list_projects.assert_called_once_with()
+        assert result[0]["key"] == "MC"
+
+
+class TestGetProject:
+    def test_returns_issue_types(self, mock_jira):
+        mock_jira.get_project.return_value = {
+            "key": "MC", "name": "Mission Control", "id": "10364",
+            "style": "classic", "issue_types": ["Task", "Epic", "Feature"],
+        }
+        from atlassian_cli.mcp import get_project
+        result = get_project("MC")
+        mock_jira.get_project.assert_called_once_with("MC")
+        assert "Feature" in result["issue_types"]
+
+
+class TestCreateProject:
+    def test_creates_with_shared_config(self, mock_jira):
+        mock_jira.create_project.return_value = {
+            "key": "CONA", "issue_types": ["Epic", "Feature", "Story", "Sub-task"],
+        }
+        from atlassian_cli.mcp import create_project
+        result = create_project("CONA", "Construction Assistant", share_with="MC")
+        mock_jira.create_project.assert_called_once_with(
+            key="CONA", name="Construction Assistant", share_with="MC", description="",
+        )
+        assert result["key"] == "CONA"
+
+    def test_defaults_share_with_to_none(self, mock_jira):
+        from atlassian_cli.mcp import create_project
+        create_project("ZZZ", "Standalone")
+        mock_jira.create_project.assert_called_once_with(
+            key="ZZZ", name="Standalone", share_with=None, description="",
+        )
+
+    def test_handler_wires_arguments(self, mock_jira):
+        from atlassian_cli.mcp import _HANDLERS
+        _HANDLERS["create_project"]({"key": "AAA", "name": "A", "share_with": "MC"})
+        mock_jira.create_project.assert_called_once_with(
+            key="AAA", name="A", share_with="MC", description="",
+        )
+
+    def test_project_tools_registered(self):
+        from atlassian_cli.mcp import _HANDLERS, _TOOLS
+        names = {t.name for t in _TOOLS}
+        for tool in ("list_projects", "get_project", "create_project"):
+            assert tool in names and tool in _HANDLERS
+
+
+class TestSetParent:
+    def test_sets_parent(self, mock_jira):
+        from atlassian_cli.mcp import set_parent
+        result = set_parent("CONA-3", "CONA-1")
+        mock_jira.set_parent.assert_called_once_with("CONA-3", "CONA-1")
+        assert result == {"key": "CONA-3", "parent": "CONA-1"}
+
+    def test_detaches_when_parent_omitted(self, mock_jira):
+        from atlassian_cli.mcp import set_parent
+        result = set_parent("CONA-3")
+        mock_jira.set_parent.assert_called_once_with("CONA-3", None)
+        assert result["parent"] is None
+
+    def test_registered_and_wired(self, mock_jira):
+        from atlassian_cli.mcp import _HANDLERS, _TOOLS
+        assert "set_parent" in {t.name for t in _TOOLS}
+        _HANDLERS["set_parent"]({"key": "A-2", "parent_key": "A-1"})
+        mock_jira.set_parent.assert_called_once_with("A-2", "A-1")
